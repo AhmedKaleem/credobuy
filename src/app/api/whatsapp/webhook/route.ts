@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getWhatsAppCloudConfig } from "@/lib/config";
+import { getWhatsAppVerifyToken } from "@/lib/config";
 import {
   parseWhatsAppActionPayload,
   parseWhatsAppTextCommand,
@@ -10,23 +10,44 @@ import { sendWhatsAppText } from "@/lib/whatsapp/client";
 
 export const runtime = "nodejs";
 
-/** Meta webhook verification */
+/**
+ * Meta webhook verification (GET with hub.* query params).
+ * Opening this URL in a browser without those params is expected to fail.
+ */
 export async function GET(request: Request) {
-  const cfg = getWhatsAppCloudConfig();
   const url = new URL(request.url);
   const mode = url.searchParams.get("hub.mode");
   const token = url.searchParams.get("hub.verify_token");
   const challenge = url.searchParams.get("hub.challenge");
+  const expected = getWhatsAppVerifyToken();
 
-  if (
-    mode === "subscribe" &&
-    cfg &&
-    token === cfg.verifyToken &&
-    challenge
-  ) {
-    return new NextResponse(challenge, { status: 200 });
+  // Plain browser visit — not a Meta verification request
+  if (!mode && !token && !challenge) {
+    return NextResponse.json(
+      {
+        ok: true,
+        message:
+          "WhatsApp webhook is live. Meta will call this URL with hub.mode / hub.verify_token / hub.challenge during setup.",
+      },
+      { status: 200 }
+    );
   }
-  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  if (mode === "subscribe" && token === expected && challenge) {
+    return new NextResponse(challenge, {
+      status: 200,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  return NextResponse.json(
+    {
+      error: "Forbidden",
+      hint:
+        "hub.verify_token must match WHATSAPP_VERIFY_TOKEN in Vercel env (default: credobuy-wa-verify).",
+    },
+    { status: 403 }
+  );
 }
 
 type WaMessage = {

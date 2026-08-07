@@ -60,6 +60,11 @@ export function getAppBaseUrl(): string {
   return `https://${raw.replace(/\/$/, "")}`;
 }
 
+/** Verify token for Meta webhook handshake (does not require send credentials). */
+export function getWhatsAppVerifyToken(): string {
+  return process.env.WHATSAPP_VERIFY_TOKEN?.trim() || "credobuy-wa-verify";
+}
+
 /** Meta WhatsApp Cloud API (optional — enables tap Accept/Reject in WhatsApp). */
 export function getWhatsAppCloudConfig(): {
   token: string;
@@ -68,8 +73,7 @@ export function getWhatsAppCloudConfig(): {
 } | null {
   const token = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
-  const verifyToken =
-    process.env.WHATSAPP_VERIFY_TOKEN?.trim() || "credobuy-wa-verify";
+  const verifyToken = getWhatsAppVerifyToken();
   if (!token || !phoneNumberId) return null;
   return { token, phoneNumberId, verifyToken };
 }
