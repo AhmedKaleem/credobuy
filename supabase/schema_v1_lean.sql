@@ -1,0 +1,2 @@
+-- DEPRECATED — do not run this file.
+-- Use supabase/schema.sql (final V1: 20 tables, products with jsonb columns).

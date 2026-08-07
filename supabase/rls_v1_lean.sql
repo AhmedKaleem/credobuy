@@ -1,0 +1,2 @@
+-- DEPRECATED — do not run this file.
+-- Use supabase/rls.sql (final V1).

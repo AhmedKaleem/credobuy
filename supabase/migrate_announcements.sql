@@ -1,0 +1,2 @@
+-- DEPRECATED: announcements are now part of `promotions`.
+-- Run this instead: supabase/migrate_promotions.sql
