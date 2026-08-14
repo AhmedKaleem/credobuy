@@ -2,7 +2,6 @@
 
 import crypto from "crypto";
 import Razorpay from "razorpay";
-import { isSupabaseConfigured } from "@/lib/config";
 
 function getRazorpayKeys() {
   const keyId =
@@ -12,7 +11,7 @@ function getRazorpayKeys() {
   return { keyId, keySecret };
 }
 
-export function isRazorpayConfigured(): boolean {
+function isRazorpayConfigured(): boolean {
   const { keyId, keySecret } = getRazorpayKeys();
   return Boolean(keyId && keySecret);
 }
@@ -86,14 +85,13 @@ export async function createRazorpayOrderAction(input: {
     };
   } catch (e) {
     console.error("createRazorpayOrderAction:", e);
-    const nested =
-      e &&
-      typeof e === "object" &&
-      "error" in e &&
-      (e as { error?: { description?: string; reason?: string } }).error;
-    const detail =
-      (nested && (nested.description || nested.reason)) ||
-      (e instanceof Error ? e.message : null);
+    let detail: string | null = null;
+    if (e && typeof e === "object" && "error" in e) {
+      const nested = (e as { error?: { description?: string; reason?: string } })
+        .error;
+      detail = nested?.description || nested?.reason || null;
+    }
+    if (!detail && e instanceof Error) detail = e.message;
     return {
       ok: false,
       error: detail || "Could not create Razorpay order.",
@@ -149,9 +147,4 @@ export async function getRazorpayPublicConfigAction(): Promise<{
     process.env.RAZORPAY_KEY_ID?.trim() ||
     null;
   return { enabled, keyId: enabled ? keyId : null };
-}
-
-/** Keep unused import meaningful for tree if needed later. */
-export function paymentStackReady() {
-  return isSupabaseConfigured() || isRazorpayConfigured();
 }
