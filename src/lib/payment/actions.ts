@@ -86,9 +86,17 @@ export async function createRazorpayOrderAction(input: {
     };
   } catch (e) {
     console.error("createRazorpayOrderAction:", e);
+    const nested =
+      e &&
+      typeof e === "object" &&
+      "error" in e &&
+      (e as { error?: { description?: string; reason?: string } }).error;
+    const detail =
+      (nested && (nested.description || nested.reason)) ||
+      (e instanceof Error ? e.message : null);
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "Could not create Razorpay order.",
+      error: detail || "Could not create Razorpay order.",
     };
   }
 }

@@ -205,7 +205,7 @@ export default function CheckoutPage() {
       clearCart();
 
       if (result.warning) {
-        pushToast(result.warning, "error");
+        pushToast(result.warning, "info");
       } else if (result.persisted && result.fulfillmentCount > 0) {
         pushToast(
           `Order placed — ${result.fulfillmentCount} line(s) sent to distributors`
@@ -217,8 +217,11 @@ export default function CheckoutPage() {
       }
 
       router.push(`/order-success?order=${result.order.orderNumber}`);
-    } catch {
-      pushToast("Something went wrong placing your order", "error");
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : "Something went wrong placing your order";
+      console.error("placeOrder:", e);
+      pushToast(msg, "error");
       setPlacing(false);
     }
   }

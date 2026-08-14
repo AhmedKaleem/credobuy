@@ -452,12 +452,13 @@ declare
   v_owner uuid;
 begin
   select user_id into v_owner from public.orders where id = p_order_id;
-  if v_owner is null then
+  -- Guest checkout stores user_id = null; only a missing row is "not found".
+  if not found then
     raise exception 'order not found';
   end if;
   if auth.role() <> 'service_role'
      and not public.is_admin()
-     and auth.uid() is distinct from v_owner then
+     and (v_owner is null or auth.uid() is distinct from v_owner) then
     raise exception 'not allowed';
   end if;
 
@@ -709,6 +710,7 @@ grant execute on function public.accept_fulfillment(uuid) to authenticated;
 grant execute on function public.reject_fulfillment(uuid, text) to authenticated;
 grant execute on function public.admin_reroute_fulfillment(uuid, uuid, text) to authenticated;
 grant execute on function public.create_fulfillments_for_order(uuid) to authenticated;
+grant execute on function public.create_fulfillments_for_order(uuid) to service_role;
 grant execute on function public.assign_fulfillment(uuid, uuid, boolean) to authenticated;
 grant execute on function public.auto_assign_fulfillment(uuid) to authenticated;
 grant execute on function public.expire_stale_fulfillment_offers() to authenticated;
