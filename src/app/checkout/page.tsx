@@ -28,6 +28,12 @@ import {
 } from "@/lib/cart";
 import { resolveCartItemsAction } from "@/lib/query-actions";
 import { getPaymentService } from "@/lib/payment";
+import {
+  createRazorpayOrderAction,
+  getRazorpayPublicConfigAction,
+  verifyRazorpayPaymentAction,
+} from "@/lib/payment/actions";
+import { openRazorpayCheckout } from "@/lib/payment/razorpay-checkout";
 import { placeOrderAction } from "@/lib/orders/place-order";
 import { generateOrderNumber, formatINR, cn } from "@/lib/utils";
 import type { Address, PaymentMethod } from "@/types";
@@ -41,10 +47,10 @@ const methods: {
   disabled?: boolean;
 }[] = [
   {
-    id: "mock",
-    label: "Pay Online (Demo)",
-    desc: "Simulated secure payment — no real charge.",
-    icon: Wallet,
+    id: "razorpay",
+    label: "Pay Online (UPI / Cards)",
+    desc: "Secure checkout via Razorpay.",
+    icon: CreditCard,
   },
   {
     id: "cod",
@@ -53,11 +59,10 @@ const methods: {
     icon: Banknote,
   },
   {
-    id: "razorpay",
-    label: "Razorpay (Coming soon)",
-    desc: "Cards, UPI & netbanking — integration in progress.",
-    icon: CreditCard,
-    disabled: true,
+    id: "mock",
+    label: "Pay Online (Demo)",
+    desc: "Simulated payment — no real charge.",
+    icon: Wallet,
   },
 ];
 
@@ -67,7 +72,8 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [chosenAddressId, setChosenAddressId] = useState<string | null>(null);
-  const [method, setMethod] = useState<PaymentMethod>("mock");
+  const [method, setMethod] = useState<PaymentMethod>("razorpay");
+  const [razorpayReady, setRazorpayReady] = useState(false);
 
   const items = useCart((s) => s.items);
   const clearCart = useCart((s) => s.clear);
@@ -88,6 +94,13 @@ export default function CheckoutPage() {
     };
   }, [items]);
 
+  useEffect(() => {
+    getRazorpayPublicConfigAction().then((cfg) => {
+      setRazorpayReady(cfg.enabled);
+      if (!cfg.enabled) setMethod((m) => (m === "razorpay" ? "mock" : m));
+    });
+  }, []);
+
   const totals = computeTotals(resolved);
 
   // Effective selection: the explicit choice, else the default/first address.
@@ -105,8 +118,57 @@ export default function CheckoutPage() {
     setPlacing(true);
     const orderNumber = generateOrderNumber();
     try {
-      const payment = getPaymentService();
-      if (method !== "cod") {
+      let gatewayOrderId: string | undefined;
+      let gatewayPaymentId: string | undefined;
+      let paymentMethod: PaymentMethod = method;
+
+      if (method === "razorpay") {
+        const intent = await createRazorpayOrderAction({
+          orderNumber,
+          amountInr: totals.total,
+          customerName: selectedAddress.fullName,
+          customerEmail: "customer@credobuy.in",
+          customerPhone: selectedAddress.phone,
+        });
+        if (!intent.ok) {
+          pushToast(intent.error, "error");
+          setPlacing(false);
+          return;
+        }
+
+        const checkout = await openRazorpayCheckout({
+          keyId: intent.keyId,
+          razorpayOrderId: intent.razorpayOrderId,
+          amountPaise: intent.amountPaise,
+          currency: "INR",
+          orderNumber,
+          customerName: selectedAddress.fullName,
+          customerEmail: "customer@credobuy.in",
+          customerPhone: selectedAddress.phone,
+        });
+
+        if (!checkout.ok) {
+          if (!checkout.cancelled) pushToast(checkout.error, "error");
+          setPlacing(false);
+          return;
+        }
+
+        const verified = await verifyRazorpayPaymentAction({
+          razorpayOrderId: checkout.payment.razorpay_order_id,
+          razorpayPaymentId: checkout.payment.razorpay_payment_id,
+          razorpaySignature: checkout.payment.razorpay_signature,
+        });
+        if (!verified.ok) {
+          pushToast(verified.error, "error");
+          setPlacing(false);
+          return;
+        }
+
+        gatewayOrderId = verified.razorpayOrderId;
+        gatewayPaymentId = verified.razorpayPaymentId;
+        paymentMethod = "razorpay";
+      } else if (method === "mock") {
+        const payment = getPaymentService();
         const intent = await payment.createIntent({
           orderNumber,
           amount: totals.total,
@@ -127,8 +189,10 @@ export default function CheckoutPage() {
       const result = await placeOrderAction({
         items,
         address: selectedAddress,
-        paymentMethod: method,
+        paymentMethod,
         orderNumber,
+        gatewayOrderId,
+        gatewayPaymentId,
       });
 
       if (!result.ok) {
@@ -246,12 +310,16 @@ export default function CheckoutPage() {
           <section className="rounded-[var(--radius-card)] border border-border bg-surface p-5">
             <h2 className="mb-3 text-lg font-bold">Payment Method</h2>
             <div className="space-y-2">
-              {methods.map((m) => (
+              {methods.map((m) => {
+                const disabled =
+                  Boolean(m.disabled) ||
+                  (m.id === "razorpay" && !razorpayReady);
+                return (
                 <label
                   key={m.id}
                   className={cn(
                     "flex cursor-pointer items-center gap-3 rounded-[var(--radius-card)] border p-3.5 transition-colors",
-                    m.disabled && "cursor-not-allowed opacity-60",
+                    disabled && "cursor-not-allowed opacity-60",
                     method === m.id ? "border-primary bg-primary-soft" : "border-border"
                   )}
                 >
@@ -259,7 +327,7 @@ export default function CheckoutPage() {
                     type="radio"
                     name="payment"
                     checked={method === m.id}
-                    disabled={m.disabled}
+                    disabled={disabled}
                     onChange={() => setMethod(m.id)}
                     className="h-4 w-4 accent-[var(--color-primary)]"
                   />
@@ -267,12 +335,16 @@ export default function CheckoutPage() {
                   <span className="flex-1">
                     <span className="flex items-center gap-2 text-sm font-medium">
                       {m.label}
+                      {m.id === "razorpay" && !razorpayReady && (
+                        <Badge tone="muted">Add keys</Badge>
+                      )}
                       {m.disabled && <Badge tone="muted">Soon</Badge>}
                     </span>
                     <span className="text-xs text-muted">{m.desc}</span>
                   </span>
                 </label>
-              ))}
+                );
+              })}
             </div>
             <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">
               <ShieldCheck size={14} className="text-success" />

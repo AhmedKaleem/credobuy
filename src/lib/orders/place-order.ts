@@ -24,6 +24,9 @@ export type PlaceOrderInput = {
   couponCode?: string;
   /** Prefill when payment intent already used this number. */
   orderNumber?: string;
+  /** Razorpay / gateway references after successful capture. */
+  gatewayOrderId?: string;
+  gatewayPaymentId?: string;
 };
 
 export type PlaceOrderResult =
@@ -239,6 +242,8 @@ export async function placeOrderAction(
   const { error: payError } = await sb.from("payments").insert({
     order_id: orderId,
     gateway: paymentMethod === "razorpay" ? "razorpay" : paymentMethod,
+    gateway_order_id: input.gatewayOrderId ?? null,
+    gateway_payment_id: input.gatewayPaymentId ?? null,
     amount: totals.total,
     currency: "INR",
     status: paymentStatus,

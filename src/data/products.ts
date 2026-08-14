@@ -2138,4 +2138,63 @@ function build(seed: Seed, index: number): Product {
   };
 }
 
-export const products: Product[] = seeds.map(build);
+export const products: Product[] = [
+  ...seeds.map(build),
+  {
+    id: "credobuy-payment-test-49",
+    slug: "credobuy-payment-test-49",
+    title: "CredoBuy Payment Test Item (₹49)",
+    brandId: "brand-credobuy",
+    brandName: "CredoBuy",
+    categoryId: "cat-cables",
+    department: "Accessories",
+    taxonomyCategory: "Cables",
+    subCategory: "Test",
+    series: "QA",
+    productCategory: "Test SKU",
+    productType: "Payment test",
+    variantLabel: "Default",
+    compatibleDevice: "Universal",
+    shortDescription: "Low-value SKU for Razorpay test payments under ₹100.",
+    description:
+      "Use this product to verify Razorpay checkout end-to-end. Not for retail sale.",
+    price: 49,
+    mrp: 49,
+    rating: 5,
+    reviewCount: 1,
+    stockStatus: "in_stock",
+    stock: 100,
+    images: [
+      {
+        id: "credobuy-payment-test-49-img",
+        productId: "credobuy-payment-test-49",
+        url: productPlaceholder("Payment Test", "credobuy-payment-test-49"),
+        alt: "Payment test item",
+        sortOrder: 0,
+      },
+    ],
+    variants: [
+      {
+        id: "credobuy-payment-test-49-default",
+        productId: "credobuy-payment-test-49",
+        sku: "CB-PAY-TEST-49",
+        name: "Default",
+        price: 49,
+        mrp: 49,
+        stock: 100,
+        isDefault: true,
+      },
+    ],
+    features: ["Razorpay test SKU", "Under ₹100"],
+    specs: [{ label: "Purpose", value: "Payment QA" }],
+    compatibleModelIds: [],
+    universal: true,
+    colors: ["Black"],
+    warrantyMonths: 0,
+    isTrending: false,
+    isBestSeller: false,
+    isNewArrival: true,
+    tags: ["payment-test", "razorpay"],
+    createdAt: "2026-08-14T00:00:00.000Z",
+  },
+];
