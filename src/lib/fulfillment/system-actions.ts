@@ -74,12 +74,25 @@ export async function runFulfillmentActionByCode(
   });
   if (error) return { ok: false, error: error.message };
   await markTokenUsed(token.code, "reject");
+
+  const fulfillment = mapFulfillment(
+    (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
+  );
+
+  // Auto-reroute may create a new "offered" row — notify the next partner
+  try {
+    const { notifyDistributorsForOrder } = await import(
+      "@/lib/fulfillment/notify"
+    );
+    await notifyDistributorsForOrder(fulfillment.orderId);
+  } catch (e) {
+    console.error("notify after reject failed:", e);
+  }
+
   return {
     ok: true,
     action: "reject",
-    fulfillment: mapFulfillment(
-      (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
-    ),
+    fulfillment,
   };
 }
 

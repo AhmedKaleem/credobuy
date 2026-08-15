@@ -44,6 +44,13 @@ export async function sendWhatsAppText(
   if (!res.ok) {
     const err = await res.text();
     console.error("WhatsApp text send failed:", err);
+    if (err.includes("131030") || err.includes("not in allowed list")) {
+      return {
+        ok: false,
+        error:
+          "Recipient phone not on Meta WhatsApp allowlist (add the distributor number in Meta Developer → WhatsApp → API Setup → To).",
+      };
+    }
     return { ok: false, error: err.slice(0, 200) };
   }
   return { ok: true };
@@ -106,6 +113,13 @@ export async function sendWhatsAppAssignmentButtons(input: {
   if (!res.ok) {
     const err = await res.text();
     console.error("WhatsApp interactive send failed:", err);
+    if (err.includes("131030") || err.includes("not in allowed list")) {
+      return {
+        ok: false,
+        error:
+          "Recipient phone not on Meta WhatsApp allowlist (add the distributor number in Meta Developer → WhatsApp → API Setup → To).",
+      };
+    }
     return { ok: false, error: err.slice(0, 200) };
   }
   return { ok: true };

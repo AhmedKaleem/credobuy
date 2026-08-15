@@ -501,15 +501,20 @@ declare
   v_ok boolean;
   v_dist uuid;
 begin
+  -- service_role: WhatsApp webhook / magic-link (token already authorized the partner)
   v_dist := public.current_distributor_id();
-  if v_dist is null and not public.is_admin() then
+  if auth.role() <> 'service_role'
+     and v_dist is null
+     and not public.is_admin() then
     raise exception 'distributor login required';
   end if;
 
   select * into f from public.order_fulfillments where id = p_fulfillment_id for update;
   if not found then raise exception 'fulfillment not found'; end if;
   if f.status <> 'offered' then raise exception 'not in offered state'; end if;
-  if not public.is_admin() and f.distributor_id <> v_dist then
+  if auth.role() <> 'service_role'
+     and not public.is_admin()
+     and f.distributor_id <> v_dist then
     raise exception 'not your assignment';
   end if;
 
@@ -524,9 +529,10 @@ begin
   where id = p_fulfillment_id
   returning * into f;
 
+  -- Prepaid is already confirmed; COD pending → confirmed on accept
   update public.orders
   set status = 'confirmed'
-  where id = f.order_id and status = 'pending';
+  where id = f.order_id and status in ('pending', 'confirmed');
 
   perform public.log_fulfillment_event(
     p_fulfillment_id, 'accepted', 'offered', 'accepted', '{}'::jsonb
@@ -707,8 +713,11 @@ create policy "distributor read self" on public.distributors
   for select using (user_id = auth.uid() or public.is_admin());
 
 grant execute on function public.accept_fulfillment(uuid) to authenticated;
+grant execute on function public.accept_fulfillment(uuid) to service_role;
 grant execute on function public.reject_fulfillment(uuid, text) to authenticated;
+grant execute on function public.reject_fulfillment(uuid, text) to service_role;
 grant execute on function public.admin_reroute_fulfillment(uuid, uuid, text) to authenticated;
+grant execute on function public.admin_reroute_fulfillment(uuid, uuid, text) to service_role;
 grant execute on function public.create_fulfillments_for_order(uuid) to authenticated;
 grant execute on function public.create_fulfillments_for_order(uuid) to service_role;
 grant execute on function public.assign_fulfillment(uuid, uuid, boolean) to authenticated;

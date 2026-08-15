@@ -1,9 +1,6 @@
--- ============================================================================
--- Magic-link / WhatsApp action tokens + service-role accept
--- Run after migrate_fulfillment.sql
--- ============================================================================
+-- Ensure WhatsApp / magic-link accept works via service_role
+-- and grants are present. Safe to re-run.
 
--- Allow system (service role) to accept without distributor session
 create or replace function public.accept_fulfillment(p_fulfillment_id uuid)
 returns public.order_fulfillments
 language plpgsql security definer set search_path = public as $$
@@ -49,27 +46,7 @@ begin
   return f;
 end $$;
 
+grant execute on function public.accept_fulfillment(uuid) to authenticated;
 grant execute on function public.accept_fulfillment(uuid) to service_role;
+grant execute on function public.reject_fulfillment(uuid, text) to authenticated;
 grant execute on function public.reject_fulfillment(uuid, text) to service_role;
-
--- One-time codes for magic links + WhatsApp button payloads
-create table if not exists public.fulfillment_action_tokens (
-  id uuid primary key default uuid_generate_v4(),
-  code text unique not null,
-  fulfillment_id uuid not null references public.order_fulfillments(id) on delete cascade,
-  distributor_id uuid not null references public.distributors(id) on delete cascade,
-  expires_at timestamptz not null,
-  used_at timestamptz,
-  used_action text,
-  created_at timestamptz not null default now()
-);
-create index if not exists idx_ff_action_tokens_code
-  on public.fulfillment_action_tokens(code);
-create index if not exists idx_ff_action_tokens_ff
-  on public.fulfillment_action_tokens(fulfillment_id);
-
-alter table public.fulfillment_action_tokens enable row level security;
-
-drop policy if exists "admin all action tokens" on public.fulfillment_action_tokens;
-create policy "admin all action tokens" on public.fulfillment_action_tokens
-  for all using (public.is_admin()) with check (public.is_admin());

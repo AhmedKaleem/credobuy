@@ -275,6 +275,15 @@ export async function placeOrderAction(
       const notify = await notifyDistributorsForOrder(orderId);
       if (notify.errors.length) {
         console.warn("fulfillment notify:", notify.errors);
+        if (notify.notified === 0) {
+          warning =
+            (warning ? warning + " " : "") +
+            `Distributor notify failed: ${notify.errors[0]}`;
+        }
+      } else if (notify.notified === 0 && fulfillmentCount > 0) {
+        warning =
+          (warning ? warning + " " : "") +
+          "Assignment created but no WhatsApp/email was sent (check distributor phone allowlist / Resend).";
       }
     } catch (e) {
       console.error("fulfillment notify failed:", e);
