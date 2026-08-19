@@ -119,9 +119,11 @@ async function handleWebhook(body: unknown) {
     object?: string;
     entry?: Array<{
       changes?: Array<{
+        field?: string;
         value?: {
           messages?: WaMessage[];
           statuses?: unknown[];
+          metadata?: { phone_number_id?: string };
         };
       }>;
     }>;
@@ -133,11 +135,28 @@ async function handleWebhook(body: unknown) {
       (e) => e.changes?.flatMap((c) => c.value?.messages ?? []) ?? []
     ) ?? [];
 
-  if (!messages.length) return;
+  if (!messages.length) {
+    // Useful when Meta only sends statuses — confirms webhook is reachable
+    const statusCount =
+      root.entry?.flatMap(
+        (e) => e.changes?.flatMap((c) => c.value?.statuses ?? []) ?? []
+      ).length ?? 0;
+    if (statusCount > 0) {
+      console.info("WhatsApp webhook: status update(s) only", { statusCount });
+    }
+    return;
+  }
+
+  console.info("WhatsApp webhook: inbound messages", {
+    count: messages.length,
+    types: messages.map((m) => m.type),
+  });
 
   // Cloud API is configured for replies
   if (!getWhatsAppCloudConfig()) {
-    console.warn("WhatsApp webhook: message received but Cloud API not configured");
+    console.warn(
+      "WhatsApp webhook: message received but Cloud API not configured"
+    );
   }
 
   for (const msg of messages) {
@@ -184,7 +203,16 @@ async function handleWebhook(body: unknown) {
     }
 
     // Ignore stickers, reactions, unrelated chat — no spam replies
-    if (!action) continue;
+    if (!action) {
+      console.info("WhatsApp webhook: ignored message", {
+        from,
+        type: msg.type,
+        button: msg.button,
+        interactive: msg.interactive,
+        text: msg.text?.body?.slice(0, 80),
+      });
+      continue;
+    }
 
     if (!code) {
       await sendWhatsAppText(
@@ -201,14 +229,20 @@ async function handleWebhook(body: unknown) {
     );
 
     if (!result.ok) {
-      await sendWhatsAppText(from, `CredoBuy: ${result.error}`);
+      // Friendly copy when they tap Accept again on the same template message
+      const already =
+        /already|accepted|rejected|used|expired/i.test(result.error) &&
+        action === "accept"
+          ? "CredoBuy: this assignment is already accepted. Visit the distributor portal for details."
+          : `CredoBuy: ${result.error}`;
+      await sendWhatsAppText(from, already);
       continue;
     }
 
     if (result.action === "accept") {
       await sendWhatsAppText(
         from,
-        "CredoBuy: Accepted. Stock committed — please pack and ship. Thank you!"
+        "CredoBuy: Accepted. Stock committed — please pack and ship. Open Visit website /distributor for details. Thank you!"
       );
     } else {
       await sendWhatsAppText(
