@@ -96,13 +96,19 @@ export async function runFulfillmentActionByCode(
   };
 }
 
-/** Parse WhatsApp interactive button id: ff:accept:CODE or ff:reject:CODE */
+/** Parse WhatsApp button payload: ff:accept:CODE, ff:reject:CODE, or plain Accept/Reject */
 export function parseWhatsAppActionPayload(
   payload: string
-): { action: ActionKind; code: string } | null {
-  const m = payload.trim().match(/^ff:(accept|reject):([A-Za-z0-9_-]+)$/i);
-  if (!m) return null;
-  return { action: m[1].toLowerCase() as ActionKind, code: m[2] };
+): { action: ActionKind; code?: string } | null {
+  const raw = payload.trim();
+  const m = raw.match(/^ff:(accept|reject):([A-Za-z0-9_-]+)$/i);
+  if (m) {
+    return { action: m[1].toLowerCase() as ActionKind, code: m[2] };
+  }
+  // Template quick-reply may return the button title when no payload was bound
+  if (/^accept$/i.test(raw)) return { action: "accept" };
+  if (/^reject$/i.test(raw)) return { action: "reject" };
+  return null;
 }
 
 /**

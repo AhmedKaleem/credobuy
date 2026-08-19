@@ -6,14 +6,16 @@ import {
   getContactFromEmail,
 } from "@/lib/config";
 import {
+  sendWhatsAppDistributorOfferTemplate,
   sendWhatsAppAssignmentButtons,
   sendWhatsAppText,
 } from "@/lib/whatsapp/client";
+import { formatINR } from "@/lib/utils";
 import { Resend } from "resend";
 
 /**
  * After fulfillments are created/assigned, notify each offered distributor
- * via WhatsApp buttons (preferred) and/or email magic links.
+ * via WhatsApp template (preferred), session buttons, and/or email magic links.
  */
 export async function notifyDistributorsForOrder(
   orderId: string
@@ -47,7 +49,7 @@ export async function notifyDistributorsForOrder(
     await Promise.all([
       sb
         .from("orders")
-        .select("order_number")
+        .select("order_number, total")
         .eq("id", orderId)
         .maybeSingle(),
       productIds.length
@@ -100,6 +102,14 @@ export async function notifyDistributorsForOrder(
       ? productMap.get(String(row.product_id)) ?? "Product"
       : "Product";
 
+    const lineTotal =
+      Number(row.customer_unit_price ?? 0) * Number(row.quantity ?? 1);
+    const totalPriceLabel = formatINR(
+      Number.isFinite(lineTotal) && lineTotal > 0
+        ? lineTotal
+        : Number(order?.total ?? 0)
+    );
+
     const token = await createFulfillmentActionToken({
       fulfillmentId: String(row.id),
       distributorId: dist.id,
@@ -112,10 +122,14 @@ export async function notifyDistributorsForOrder(
       continue;
     }
 
+    const acceptPayload = `ff:accept:${token.code}`;
+    const rejectPayload = `ff:reject:${token.code}`;
+
     const body = [
       `CredoBuy assignment`,
       `Order ${orderNumber}`,
       `${productTitle} × ${row.quantity}`,
+      `Total Price : ${totalPriceLabel}`,
       `Customer price locked — tap Accept or Reject.`,
       `Or reply: ACCEPT ${token.code} / REJECT ${token.code}`,
     ].join("\n");
@@ -123,21 +137,38 @@ export async function notifyDistributorsForOrder(
     let sent = false;
 
     if (isWhatsAppCloudConfigured() && dist.phone) {
-      const wa = await sendWhatsAppAssignmentButtons({
+      const tpl = await sendWhatsAppDistributorOfferTemplate({
         toPhone: dist.phone,
-        body,
-        acceptPayload: `ff:accept:${token.code}`,
-        rejectPayload: `ff:reject:${token.code}`,
+        orderNumber,
+        productTitle,
+        quantity: Number(row.quantity),
+        totalPriceLabel,
+        acceptPayload,
+        rejectPayload,
       });
-      if (wa.ok) {
+      if (tpl.ok) {
         sent = true;
       } else {
-        const text = await sendWhatsAppText(
-          dist.phone,
-          `${body}\n\nAccept: ${token.acceptUrl}\nReject: ${token.rejectUrl}`
-        );
-        if (text.ok) sent = true;
-        else errors.push(`WhatsApp ${dist.name}: ${wa.error}`);
+        // Fallback: session interactive (works inside 24h window / test chats)
+        const wa = await sendWhatsAppAssignmentButtons({
+          toPhone: dist.phone,
+          body,
+          acceptPayload,
+          rejectPayload,
+        });
+        if (wa.ok) {
+          sent = true;
+        } else {
+          const text = await sendWhatsAppText(
+            dist.phone,
+            `${body}\n\nAccept: ${token.acceptUrl}\nReject: ${token.rejectUrl}\nPortal: https://credobuy.vercel.app/distributor`
+          );
+          if (text.ok) sent = true;
+          else
+            errors.push(
+              `WhatsApp ${dist.name}: ${tpl.error || wa.error || "send failed"}`
+            );
+        }
       }
     }
 
@@ -155,6 +186,7 @@ export async function notifyDistributorsForOrder(
             "",
             `Accept: ${token.acceptUrl}`,
             `Reject: ${token.rejectUrl}`,
+            "Portal: https://credobuy.vercel.app/distributor",
             "",
             "Customer price is locked. Rejecting will auto-route to another partner.",
           ].join("\n"),

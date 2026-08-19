@@ -147,20 +147,22 @@ async function handleWebhook(body: unknown) {
     let action: "accept" | "reject" | null = null;
     let code: string | undefined;
 
-    // Interactive reply buttons (preferred)
-    if (msg.type === "interactive" && msg.interactive?.button_reply?.id) {
-      const parsed = parseWhatsAppActionPayload(
-        msg.interactive.button_reply.id
-      );
+    // Interactive reply buttons (session + template quick replies)
+    if (msg.type === "interactive" && msg.interactive?.button_reply) {
+      const id = msg.interactive.button_reply.id ?? "";
+      const title = msg.interactive.button_reply.title ?? "";
+      const parsed =
+        parseWhatsAppActionPayload(id) || parseWhatsAppActionPayload(title);
       if (parsed) {
         action = parsed.action;
         code = parsed.code;
       }
     }
 
-    // Legacy quick-reply button payload
-    if (!action && msg.type === "button" && msg.button?.payload) {
-      const parsed = parseWhatsAppActionPayload(msg.button.payload);
+    // Template / legacy quick-reply button payload
+    if (!action && msg.type === "button" && msg.button) {
+      const payload = msg.button.payload ?? msg.button.text ?? "";
+      const parsed = parseWhatsAppActionPayload(payload);
       if (parsed) {
         action = parsed.action;
         code = parsed.code;
@@ -173,10 +175,12 @@ async function handleWebhook(body: unknown) {
       if (parsed) {
         action = parsed.action;
         code = parsed.code;
-        if (!code) {
-          code = (await findLatestOpenTokenForPhone(from)) ?? undefined;
-        }
       }
+    }
+
+    // Template Accept/Reject without embedded code → latest open token for this phone
+    if (action && !code) {
+      code = (await findLatestOpenTokenForPhone(from)) ?? undefined;
     }
 
     // Ignore stickers, reactions, unrelated chat — no spam replies

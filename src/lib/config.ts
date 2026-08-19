@@ -65,6 +65,18 @@ export function getWhatsAppVerifyToken(): string {
   return process.env.WHATSAPP_VERIFY_TOKEN?.trim() || "credobuy-wa-verify";
 }
 
+/** Approved utility template for distributor assignment offers. */
+export function getWhatsAppOfferTemplate(): {
+  name: string;
+  language: string;
+} {
+  return {
+    name:
+      process.env.WHATSAPP_TEMPLATE_NAME?.trim() || "distributor_order_offer",
+    language: process.env.WHATSAPP_TEMPLATE_LANG?.trim() || "en",
+  };
+}
+
 /** Meta WhatsApp Cloud API (optional — enables tap Accept/Reject in WhatsApp). */
 export function getWhatsAppCloudConfig(): {
   token: string;
