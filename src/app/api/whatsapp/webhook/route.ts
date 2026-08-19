@@ -23,17 +23,41 @@ export async function GET(request: Request) {
   const challenge = url.searchParams.get("hub.challenge");
   const expected = getWhatsAppVerifyToken();
 
+  // Plain browser visit — not a Meta verification request
+  if (!mode && !token && !challenge && url.searchParams.get("debug") !== "1") {
+    return NextResponse.json(
+      {
+        ok: true,
+        version: "wa-webhook-2026-08-20",
+        message:
+          "WhatsApp webhook is live. Meta will call this URL with hub.mode / hub.verify_token / hub.challenge during setup.",
+        callbackUrl: "https://credobuy.vercel.app/api/whatsapp/webhook",
+        debug:
+          "Open /api/whatsapp/webhook?debug=1&hub.verify_token=YOUR_VERIFY_TOKEN to see recent inbound events.",
+      },
+      { status: 200 }
+    );
+  }
+
   // Debug dump of recent webhook hits (verify token required)
   if (url.searchParams.get("debug") === "1") {
     const debugToken =
-      url.searchParams.get("token") || url.searchParams.get("hub.verify_token");
+      url.searchParams.get("hub.verify_token") ||
+      url.searchParams.get("token");
     if (debugToken !== expected) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        {
+          error: "Forbidden",
+          hint: "Pass hub.verify_token matching WHATSAPP_VERIFY_TOKEN",
+        },
+        { status: 403 }
+      );
     }
     const sb = createServiceClient();
     if (!sb) {
       return NextResponse.json({
         ok: false,
+        version: "wa-webhook-2026-08-20",
         error: "No service client — set SUPABASE_SERVICE_ROLE_KEY on Vercel.",
       });
     }
@@ -46,32 +70,21 @@ export async function GET(request: Request) {
       .limit(20);
     return NextResponse.json({
       ok: true,
+      version: "wa-webhook-2026-08-20",
       webhookUrl: "https://credobuy.vercel.app/api/whatsapp/webhook",
       verifyTokenConfigured: Boolean(expected),
       cloudApiConfigured: Boolean(getWhatsAppCloudConfig()),
       events: error ? [] : data ?? [],
       eventsError: error?.message ?? null,
       hint:
-        error?.message?.includes("whatsapp_webhook_events")
+        error?.message?.includes("whatsapp_webhook_events") ||
+        error?.code === "42P01" ||
+        error?.message?.includes("does not exist")
           ? "Run supabase/migrate_whatsapp_webhook_events.sql in Supabase SQL editor."
           : !data?.length
             ? "No webhook POSTs logged yet — Meta is not reaching this URL, or messages is not subscribed."
             : null,
     });
-  }
-
-  // Plain browser visit — not a Meta verification request
-  if (!mode && !token && !challenge) {
-    return NextResponse.json(
-      {
-        ok: true,
-        message:
-          "WhatsApp webhook is live. Meta will call this URL with hub.mode / hub.verify_token / hub.challenge during setup.",
-        debug:
-          "Add ?debug=1&token=YOUR_VERIFY_TOKEN to see recent inbound webhook events.",
-      },
-      { status: 200 }
-    );
   }
 
   if (mode === "subscribe" && token === expected && challenge) {
