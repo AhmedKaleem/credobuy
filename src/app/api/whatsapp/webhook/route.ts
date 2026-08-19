@@ -64,26 +64,76 @@ export async function GET(request: Request) {
     const { data, error } = await sb
       .from("whatsapp_webhook_events")
       .select(
-        "id, received_at, signature_ok, phone_number_id, message_types, from_phone, parsed_action, parsed_code, handler_result, error"
+        "id, received_at, signature_ok, phone_number_id, message_types, from_phone, parsed_action, parsed_code, handler_result, error, payload"
       )
       .order("received_at", { ascending: false })
       .limit(20);
+
+    const events = error ? [] : data ?? [];
+    const fieldsSeen = [
+      ...new Set(
+        events.flatMap((e) => {
+          const p = e.payload as {
+            entry?: Array<{
+              changes?: Array<{ field?: string }>;
+            }>;
+          } | null;
+          return (
+            p?.entry?.flatMap(
+              (en) => en.changes?.map((c) => c.field).filter(Boolean) ?? []
+            ) ?? []
+          );
+        })
+      ),
+    ];
+    const hasMessages = fieldsSeen.includes("messages");
+    const onlyTemplateStatus =
+      fieldsSeen.length > 0 &&
+      !hasMessages &&
+      fieldsSeen.every((f) => String(f).includes("template"));
+
     return NextResponse.json({
       ok: true,
       version: "wa-webhook-2026-08-20",
       webhookUrl: "https://credobuy.vercel.app/api/whatsapp/webhook",
       verifyTokenConfigured: Boolean(expected),
       cloudApiConfigured: Boolean(getWhatsAppCloudConfig()),
-      events: error ? [] : data ?? [],
+      fieldsSeen,
+      events: events.map(
+        ({
+          id,
+          received_at,
+          signature_ok,
+          phone_number_id,
+          message_types,
+          from_phone,
+          parsed_action,
+          parsed_code,
+          handler_result,
+          error: err,
+        }) => ({
+          id,
+          received_at,
+          signature_ok,
+          phone_number_id,
+          message_types,
+          from_phone,
+          parsed_action,
+          parsed_code,
+          handler_result,
+          error: err,
+        })
+      ),
       eventsError: error?.message ?? null,
-      hint:
-        error?.message?.includes("whatsapp_webhook_events") ||
-        error?.code === "42P01" ||
-        error?.message?.includes("does not exist")
-          ? "Run supabase/migrate_whatsapp_webhook_events.sql in Supabase SQL editor."
-          : !data?.length
-            ? "No webhook POSTs logged yet — Meta is not reaching this URL, or messages is not subscribed."
-            : null,
+      hint: error?.message?.includes("whatsapp_webhook_events")
+        ? "Run supabase/migrate_whatsapp_webhook_events.sql in Supabase SQL editor."
+        : onlyTemplateStatus
+          ? "Webhook is connected, but ONLY template status updates are subscribed. In Meta Developer → App → WhatsApp → Configuration → Webhook → Manage, subscribe to the 'messages' field (not only message_template_status_update). Then tap Accept again on a NEW offer."
+          : !events.length
+            ? "No webhook POSTs logged yet — Meta is not reaching this URL."
+            : !hasMessages
+              ? "Webhook POSTs received, but no 'messages' field yet. Subscribe to 'messages' in Meta webhook fields."
+              : null,
     });
   }
 
