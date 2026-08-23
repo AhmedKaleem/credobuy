@@ -7,9 +7,11 @@ import {
   acceptFulfillmentAction,
   rejectFulfillmentAction,
 } from "@/lib/fulfillment/actions";
+import { useToast } from "@/store/toast";
 
 export function AssignmentActions({ fulfillmentId }: { fulfillmentId: string }) {
   const router = useRouter();
+  const pushToast = useToast((s) => s.push);
   const [busy, setBusy] = useState<"accept" | "reject" | null>(null);
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
@@ -21,8 +23,10 @@ export function AssignmentActions({ fulfillmentId }: { fulfillmentId: string }) 
     setBusy(null);
     if (!res.ok) {
       setError(res.error);
+      pushToast(res.error, "error");
       return;
     }
+    pushToast("Order is Accepted", "success");
     router.refresh();
   }
 
@@ -33,8 +37,10 @@ export function AssignmentActions({ fulfillmentId }: { fulfillmentId: string }) 
     setBusy(null);
     if (!res.ok) {
       setError(res.error);
+      pushToast(res.error, "error");
       return;
     }
+    pushToast("Order rejected — next distributor notified", "info");
     router.refresh();
   }
 
