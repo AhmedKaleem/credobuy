@@ -1,9 +1,14 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import {
+  DIST_REMEMBER_COOKIE,
+  DIST_REMEMBER_MAX_AGE,
+} from "@/lib/auth/distributor-cookies";
 
 /**
  * Server-side Supabase client for use in Server Components, Route Handlers
  * and Server Actions. Returns null when Supabase is not configured.
+ * Extends session cookie lifetime when distributor “Stay signed in” is set.
  */
 export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -11,6 +16,7 @@ export async function createClient() {
   if (!url || !key) return null;
 
   const cookieStore = await cookies();
+  const remember = cookieStore.get(DIST_REMEMBER_COOKIE)?.value === "1";
 
   return createServerClient(url, key, {
     cookies: {
@@ -20,7 +26,10 @@ export async function createClient() {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            cookieStore.set(name, value, {
+              ...options,
+              ...(remember ? { maxAge: DIST_REMEMBER_MAX_AGE } : {}),
+            })
           );
         } catch {
           // Called from a Server Component — safe to ignore when middleware

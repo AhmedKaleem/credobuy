@@ -66,13 +66,29 @@ export async function rejectFulfillmentAction(
   });
   if (error) return { ok: false, error: rpcError(error) };
 
+  const fulfillment = mapFulfillment(
+    (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
+  );
+
+  // Reroute may create a new offered line — notify the next distributor
+  try {
+    const { applyAutoApprovalsForOrder } = await import(
+      "@/lib/fulfillment/auto-approve"
+    );
+    const { notifyDistributorsForOrder } = await import(
+      "@/lib/fulfillment/notify"
+    );
+    await applyAutoApprovalsForOrder(fulfillment.orderId);
+    await notifyDistributorsForOrder(fulfillment.orderId);
+  } catch (e) {
+    console.error("notify after portal reject failed:", e);
+  }
+
   revalidatePath("/distributor");
   revalidatePath("/admin/fulfillment");
   return {
     ok: true,
-    fulfillment: mapFulfillment(
-      (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
-    ),
+    fulfillment,
   };
 }
 
@@ -99,13 +115,28 @@ export async function adminRerouteFulfillmentAction(
   });
   if (error) return { ok: false, error: rpcError(error) };
 
+  const fulfillment = mapFulfillment(
+    (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
+  );
+
+  try {
+    const { applyAutoApprovalsForOrder } = await import(
+      "@/lib/fulfillment/auto-approve"
+    );
+    const { notifyDistributorsForOrder } = await import(
+      "@/lib/fulfillment/notify"
+    );
+    await applyAutoApprovalsForOrder(fulfillment.orderId);
+    await notifyDistributorsForOrder(fulfillment.orderId);
+  } catch (e) {
+    console.error("notify after admin reroute failed:", e);
+  }
+
   revalidatePath("/admin/fulfillment");
   revalidatePath("/distributor");
   return {
     ok: true,
-    fulfillment: mapFulfillment(
-      (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
-    ),
+    fulfillment,
   };
 }
 
@@ -126,7 +157,21 @@ export async function createFulfillmentsForOrderAction(
   });
   if (error) return { ok: false, error: rpcError(error) };
 
+  const count = Array.isArray(data) ? data.length : 0;
+  try {
+    const { applyAutoApprovalsForOrder } = await import(
+      "@/lib/fulfillment/auto-approve"
+    );
+    const { notifyDistributorsForOrder } = await import(
+      "@/lib/fulfillment/notify"
+    );
+    await applyAutoApprovalsForOrder(orderId);
+    await notifyDistributorsForOrder(orderId);
+  } catch (e) {
+    console.error("post-assign fulfillment pipeline:", e);
+  }
+
   revalidatePath("/admin/fulfillment");
   revalidatePath("/distributor");
-  return { ok: true, count: Array.isArray(data) ? data.length : 0 };
+  return { ok: true, count };
 }

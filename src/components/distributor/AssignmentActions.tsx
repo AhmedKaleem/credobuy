@@ -39,11 +39,12 @@ export function AssignmentActions({ fulfillmentId }: { fulfillmentId: string }) 
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Button
           type="button"
-          size="sm"
+          size="lg"
+          className="min-h-12 w-full touch-manipulation"
           disabled={busy !== null}
           onClick={accept}
         >
@@ -51,8 +52,9 @@ export function AssignmentActions({ fulfillmentId }: { fulfillmentId: string }) 
         </Button>
         <Button
           type="button"
-          size="sm"
+          size="lg"
           variant="outline"
+          className="min-h-12 w-full touch-manipulation"
           disabled={busy !== null}
           onClick={reject}
         >
@@ -64,9 +66,9 @@ export function AssignmentActions({ fulfillmentId }: { fulfillmentId: string }) 
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="Reject reason (optional)"
-        className="w-full rounded-[var(--radius-button)] border border-border bg-surface px-3 py-2 text-xs"
+        className="min-h-11 w-full rounded-[var(--radius-button)] border border-border bg-surface px-3 py-2.5 text-sm"
       />
-      {error ? <p className="text-xs text-danger">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

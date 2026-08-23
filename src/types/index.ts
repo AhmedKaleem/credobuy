@@ -232,6 +232,8 @@ export interface Distributor {
   productCount: number;
   userId?: UUID;
   priority?: number;
+  /** When true, offered lines are accepted automatically. */
+  autoApproval?: boolean;
 }
 
 /** Assignment lifecycle for a single order line. */

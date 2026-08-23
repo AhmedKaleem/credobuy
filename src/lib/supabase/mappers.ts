@@ -14,7 +14,7 @@ import type {
   Review,
   StockStatus,
 } from "@/types";
-import { productPlaceholder } from "@/lib/placeholder";
+import { productPlaceholder, tilePlaceholder } from "@/lib/placeholder";
 
 function stockStatus(stock: number, raw?: string): StockStatus {
   if (raw === "in_stock" || raw === "low_stock" || raw === "out_of_stock") {
@@ -52,10 +52,10 @@ function parseImages(
     ];
   }
 
-  return value
+  const parsed = value
     .map((raw, i) => {
       const img = raw as Record<string, unknown>;
-      const url = String(img.url ?? "");
+      const url = String(img.url ?? "").trim();
       if (!url) return null;
       return {
         id: String(img.id ?? `${id}-img-${i}`),
@@ -67,6 +67,19 @@ function parseImages(
     })
     .filter((x): x is ProductImage => Boolean(x))
     .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  if (parsed.length === 0) {
+    return [
+      {
+        id: `${id}-img`,
+        productId: id,
+        url: productPlaceholder(title, id),
+        alt: title,
+        sortOrder: 0,
+      },
+    ];
+  }
+  return parsed;
 }
 
 function parseVariants(
@@ -108,13 +121,16 @@ function parseVariants(
 }
 
 export function mapCategory(row: Record<string, unknown>, productCount = 0): Category {
+  const name = String(row.name);
+  const slug = String(row.slug);
+  const rawImage = row.image_url != null ? String(row.image_url).trim() : "";
   return {
     id: String(row.id),
-    slug: String(row.slug),
-    name: String(row.name),
+    slug,
+    name,
     description: String(row.description ?? ""),
     icon: String(row.icon ?? "Package"),
-    imageUrl: String(row.image_url ?? ""),
+    imageUrl: rawImage || tilePlaceholder(name, slug),
     productCount,
     sortOrder: Number(row.sort_order ?? 0),
   };
@@ -173,6 +189,7 @@ export function mapDistributor(row: Record<string, unknown>): Distributor {
     productCount: Number(row.product_count ?? 0),
     userId: row.user_id ? String(row.user_id) : undefined,
     priority: row.priority == null ? undefined : Number(row.priority),
+    autoApproval: Boolean(row.auto_approval),
   };
 }
 

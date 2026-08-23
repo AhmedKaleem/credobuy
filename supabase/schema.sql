@@ -373,6 +373,7 @@ create table if not exists public.distributors (
   user_id uuid unique references public.users(id) on delete set null,
   priority int not null default 100,
   is_active boolean not null default true,
+  auto_approval boolean not null default false,
   created_at timestamptz not null default now()
 );
 

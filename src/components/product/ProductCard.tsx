@@ -6,6 +6,7 @@ import type { Product } from "@/types";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { Price } from "@/components/ui/Price";
 import { StarRow } from "@/components/ui/Rating";
+import { productPlaceholder } from "@/lib/placeholder";
 import { discountPercent, cn } from "@/lib/utils";
 import { brands } from "@/data/catalog";
 import { useCart } from "@/store/cart";
@@ -70,7 +71,10 @@ export function ProductCard({ product }: { product: Product }) {
         <Link href={`/product/${product.slug}`} className="block">
           <div className="transition-transform duration-500 group-hover:scale-[1.04]">
             <SmartImage
-              src={image?.url ?? ""}
+              src={
+                image?.url ||
+                productPlaceholder(product.title, product.slug)
+              }
               alt={image?.alt ?? product.title}
             />
           </div>

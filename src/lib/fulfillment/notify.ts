@@ -7,15 +7,23 @@ import {
 } from "@/lib/config";
 import {
   sendWhatsAppDistributorOfferTemplate,
-  sendWhatsAppAssignmentButtons,
   sendWhatsAppText,
 } from "@/lib/whatsapp/client";
 import { formatINR } from "@/lib/utils";
 import { Resend } from "resend";
 
+function portalUrl(): string {
+  const base = (process.env.NEXT_PUBLIC_APP_URL || "https://credobuy.vercel.app").replace(
+    /\/$/,
+    ""
+  );
+  return `${base}/distributor`;
+}
+
 /**
- * After fulfillments are created/assigned, notify each offered distributor
- * via WhatsApp template (preferred), session buttons, and/or email magic links.
+ * After fulfillments are created/assigned, notify each offered distributor.
+ * Plan B: WhatsApp “Visit website” → Accept/Reject in the partner portal
+ * (template Accept/Reject buttons are unreliable via webhook).
  */
 export async function notifyDistributorsForOrder(
   orderId: string
@@ -34,7 +42,7 @@ export async function notifyDistributorsForOrder(
   if (error || !rows?.length) {
     return {
       notified: 0,
-      errors: error ? [error.message] : ["No offered fulfillments"],
+      errors: error ? [error.message] : [],
     };
   }
 
@@ -58,7 +66,7 @@ export async function notifyDistributorsForOrder(
       distIds.length
         ? sb
             .from("distributors")
-            .select("id, name, phone, email")
+            .select("id, name, phone, email, auto_approval")
             .in("id", distIds)
         : Promise.resolve({
             data: [] as {
@@ -66,6 +74,7 @@ export async function notifyDistributorsForOrder(
               name: string;
               phone: string | null;
               email: string | null;
+              auto_approval?: boolean | null;
             }[],
           }),
     ]);
@@ -81,6 +90,7 @@ export async function notifyDistributorsForOrder(
         name: String(d.name),
         phone: d.phone ? String(d.phone) : null,
         email: d.email ? String(d.email) : null,
+        autoApproval: Boolean(d.auto_approval),
       },
     ])
   );
@@ -88,6 +98,7 @@ export async function notifyDistributorsForOrder(
   const orderNumber = order?.order_number
     ? String(order.order_number)
     : orderId.slice(0, 8);
+  const site = portalUrl();
 
   let notified = 0;
   const errors: string[] = [];
@@ -97,6 +108,8 @@ export async function notifyDistributorsForOrder(
       ? distMap.get(String(row.distributor_id))
       : undefined;
     if (!dist) continue;
+    // Skip partners that should have been auto-accepted already
+    if (dist.autoApproval) continue;
 
     const productTitle = row.product_id
       ? productMap.get(String(row.product_id)) ?? "Product"
@@ -110,6 +123,7 @@ export async function notifyDistributorsForOrder(
         : Number(order?.total ?? 0)
     );
 
+    // Token kept for email deep-links / legacy act URLs; portal is primary path
     const token = await createFulfillmentActionToken({
       fulfillmentId: String(row.id),
       distributorId: dist.id,
@@ -130,8 +144,8 @@ export async function notifyDistributorsForOrder(
       `Order ${orderNumber}`,
       `${productTitle} × ${row.quantity}`,
       `Total Price : ${totalPriceLabel}`,
-      `Customer price locked — tap Accept or Reject.`,
-      `Or reply: ACCEPT ${token.code} / REJECT ${token.code}`,
+      `Open the partner portal to Accept or Reject (Visit website).`,
+      site,
     ].join("\n");
 
     let sent = false;
@@ -149,26 +163,12 @@ export async function notifyDistributorsForOrder(
       if (tpl.ok) {
         sent = true;
       } else {
-        // Fallback: session interactive (works inside 24h window / test chats)
-        const wa = await sendWhatsAppAssignmentButtons({
-          toPhone: dist.phone,
-          body,
-          acceptPayload,
-          rejectPayload,
-        });
-        if (wa.ok) {
-          sent = true;
-        } else {
-          const text = await sendWhatsAppText(
-            dist.phone,
-            `${body}\n\nAccept: ${token.acceptUrl}\nReject: ${token.rejectUrl}\nPortal: https://credobuy.vercel.app/distributor`
+        const text = await sendWhatsAppText(dist.phone, body);
+        if (text.ok) sent = true;
+        else
+          errors.push(
+            `WhatsApp ${dist.name}: ${tpl.error || text.error || "send failed"}`
           );
-          if (text.ok) sent = true;
-          else
-            errors.push(
-              `WhatsApp ${dist.name}: ${tpl.error || wa.error || "send failed"}`
-            );
-        }
       }
     }
 
@@ -184,9 +184,8 @@ export async function notifyDistributorsForOrder(
             "",
             body,
             "",
-            `Accept: ${token.acceptUrl}`,
-            `Reject: ${token.rejectUrl}`,
-            "Portal: https://credobuy.vercel.app/distributor",
+            `Partner portal: ${site}`,
+            "(Sign in once and enable Stay signed in to skip login next time.)",
             "",
             "Customer price is locked. Rejecting will auto-route to another partner.",
           ].join("\n"),
@@ -200,10 +199,9 @@ export async function notifyDistributorsForOrder(
     }
 
     if (!sent && !isWhatsAppCloudConfigured() && !isContactEmailConfigured()) {
-      console.info("[fulfillment notify] Configure WhatsApp or Resend. Links:", {
+      console.info("[fulfillment notify] Configure WhatsApp or Resend.", {
         distributor: dist.name,
-        accept: token.acceptUrl,
-        reject: token.rejectUrl,
+        portal: site,
       });
     }
 

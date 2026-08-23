@@ -269,18 +269,29 @@ export async function placeOrderAction(
   } else {
     fulfillmentCount = Array.isArray(fulfillments) ? fulfillments.length : 0;
     try {
+      const { applyAutoApprovalsForOrder } = await import(
+        "@/lib/fulfillment/auto-approve"
+      );
       const { notifyDistributorsForOrder } = await import(
         "@/lib/fulfillment/notify"
       );
+      const auto = await applyAutoApprovalsForOrder(orderId);
+      if (auto.errors.length) {
+        console.warn("auto-approval:", auto.errors);
+      }
       const notify = await notifyDistributorsForOrder(orderId);
       if (notify.errors.length) {
         console.warn("fulfillment notify:", notify.errors);
-        if (notify.notified === 0) {
+        if (notify.notified === 0 && auto.autoAccepted === 0) {
           warning =
             (warning ? warning + " " : "") +
             `Distributor notify failed: ${notify.errors[0]}`;
         }
-      } else if (notify.notified === 0 && fulfillmentCount > 0) {
+      } else if (
+        notify.notified === 0 &&
+        fulfillmentCount > 0 &&
+        auto.autoAccepted === 0
+      ) {
         warning =
           (warning ? warning + " " : "") +
           "Assignment created but no WhatsApp/email was sent (check distributor phone allowlist / Resend).";

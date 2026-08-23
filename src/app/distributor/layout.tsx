@@ -15,27 +15,31 @@ export default async function DistributorLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f1ec]">
-      <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-3">
+    <div className="min-h-[100dvh] bg-[#f3f1ec]">
+      <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <Logo />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-primary">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-primary sm:text-xs">
                 Distributor
               </p>
-              <p className="text-sm font-semibold">{session.distributorName}</p>
+              <p className="truncate text-sm font-semibold">
+                {session.distributorName}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <Link href="/distributor" className="text-muted hover:text-foreground">
+          <div className="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
+            <Link
+              href="/distributor"
+              className="hidden text-muted hover:text-foreground sm:inline"
+            >
               Assignments
             </Link>
-            <span className="hidden text-muted sm:inline">{session.email}</span>
             <form action={distributorLogoutAction}>
               <button
                 type="submit"
-                className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-surface-muted"
+                className="min-h-10 rounded-lg border border-border px-3 py-2 text-sm touch-manipulation hover:bg-surface-muted"
               >
                 Sign out
               </button>
@@ -43,7 +47,9 @@ export default async function DistributorLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-5xl px-3 py-5 pb-10 sm:px-4 sm:py-6">
+        {children}
+      </main>
     </div>
   );
 }

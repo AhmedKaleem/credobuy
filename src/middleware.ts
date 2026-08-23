@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_COOKIE } from "@/lib/config";
+import {
+  DIST_REMEMBER_COOKIE,
+  DIST_REMEMBER_MAX_AGE,
+} from "@/lib/auth/distributor-cookies";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,7 +32,8 @@ async function protectAdmin(request: NextRequest, pathname: string) {
     const { response, supabase } = createMiddlewareClient(
       request,
       supabaseUrl,
-      supabaseKey
+      supabaseKey,
+      false
     );
 
     const {
@@ -61,7 +66,6 @@ async function protectAdmin(request: NextRequest, pathname: string) {
 }
 
 async function protectDistributor(request: NextRequest, pathname: string) {
-  // Public magic-link accept/reject (no login required)
   if (
     pathname === "/distributor/login" ||
     pathname === "/distributor/act"
@@ -76,10 +80,14 @@ async function protectDistributor(request: NextRequest, pathname: string) {
     return redirectTo(request, "/distributor/login", pathname);
   }
 
+  const remember =
+    request.cookies.get(DIST_REMEMBER_COOKIE)?.value === "1";
+
   const { response, supabase } = createMiddlewareClient(
     request,
     supabaseUrl,
-    supabaseKey
+    supabaseKey,
+    remember
   );
 
   const {
@@ -118,7 +126,8 @@ async function protectDistributor(request: NextRequest, pathname: string) {
 function createMiddlewareClient(
   request: NextRequest,
   supabaseUrl: string,
-  supabaseKey: string
+  supabaseKey: string,
+  rememberDistributor: boolean
 ) {
   let response = NextResponse.next({
     request: { headers: request.headers },
@@ -135,7 +144,12 @@ function createMiddlewareClient(
         );
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options)
+          response.cookies.set(name, value, {
+            ...options,
+            ...(rememberDistributor
+              ? { maxAge: DIST_REMEMBER_MAX_AGE }
+              : {}),
+          })
         );
       },
     },

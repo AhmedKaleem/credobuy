@@ -1,11 +1,17 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   checkDemoAdminLogin,
   clearDemoAdminCookie,
   setDemoAdminCookie,
 } from "@/lib/auth/admin-session";
+import {
+  DIST_REMEMBER_COOKIE,
+  DIST_REMEMBER_MAX_AGE,
+  distributorCookieOptions,
+} from "@/lib/auth/distributor-cookies";
 import { isSupabaseConfigured } from "@/lib/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -64,7 +70,8 @@ export async function adminLogoutAction() {
 
 export async function distributorLoginAction(
   email: string,
-  password: string
+  password: string,
+  rememberMe = true
 ): Promise<AuthResult> {
   const trimmed = email.trim().toLowerCase();
   if (!trimmed || password.length < 6) {
@@ -75,6 +82,21 @@ export async function distributorLoginAction(
       ok: false,
       error: "Distributor login requires Supabase Auth.",
     };
+  }
+
+  const cookieStore = await cookies();
+  const rememberOpts = distributorCookieOptions(rememberMe);
+  if (rememberMe) {
+    cookieStore.set(DIST_REMEMBER_COOKIE, "1", {
+      ...rememberOpts,
+      httpOnly: true,
+    });
+  } else {
+    cookieStore.set(DIST_REMEMBER_COOKIE, "", {
+      ...distributorCookieOptions(false),
+      httpOnly: true,
+      maxAge: 0,
+    });
   }
 
   const sb = await createClient();
@@ -113,6 +135,17 @@ export async function distributorLoginAction(
     };
   }
 
+  // Re-assert remember flag after auth cookies were written
+  if (rememberMe) {
+    cookieStore.set(DIST_REMEMBER_COOKIE, "1", {
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: DIST_REMEMBER_MAX_AGE,
+    });
+  }
+
   return { ok: true };
 }
 
@@ -121,5 +154,10 @@ export async function distributorLogoutAction() {
     const sb = await createClient();
     await sb?.auth.signOut();
   }
+  const cookieStore = await cookies();
+  cookieStore.set(DIST_REMEMBER_COOKIE, "", {
+    path: "/",
+    maxAge: 0,
+  });
   redirect("/distributor/login");
 }

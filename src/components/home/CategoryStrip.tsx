@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import type { Category } from "@/types";
 import { Icon } from "@/components/ui/Icon";
 import { SmartImage } from "@/components/ui/SmartImage";
+import { tilePlaceholder } from "@/lib/placeholder";
 
 export function CategoryStrip({
   categories,
@@ -42,7 +43,10 @@ export function CategoryStrip({
           >
             <div className="relative aspect-[4/3] overflow-hidden rounded-[var(--radius-card)] bg-surface-muted">
               <div className="h-full w-full transition-transform duration-500 group-hover:scale-[1.05]">
-                <SmartImage src={c.imageUrl} alt={c.name} />
+                <SmartImage
+                  src={c.imageUrl || tilePlaceholder(c.name, c.slug)}
+                  alt={c.name}
+                />
               </div>
             </div>
             <div className="mt-3 flex items-center justify-between">
