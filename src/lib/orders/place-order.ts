@@ -269,32 +269,31 @@ export async function placeOrderAction(
   } else {
     fulfillmentCount = Array.isArray(fulfillments) ? fulfillments.length : 0;
     try {
-      const { applyAutoApprovalsForOrder } = await import(
-        "@/lib/fulfillment/auto-approve"
+      const { runPostAssignPipeline } = await import(
+        "@/lib/fulfillment/pipeline"
       );
-      const { notifyDistributorsForOrder } = await import(
-        "@/lib/fulfillment/notify"
-      );
-      const auto = await applyAutoApprovalsForOrder(orderId);
-      if (auto.errors.length) {
-        console.warn("auto-approval:", auto.errors);
+      const pipeline = await runPostAssignPipeline(orderId);
+      if (pipeline.errors.length) {
+        console.warn("fulfillment pipeline:", pipeline.errors);
       }
-      const notify = await notifyDistributorsForOrder(orderId);
-      if (notify.errors.length) {
-        console.warn("fulfillment notify:", notify.errors);
-        if (notify.notified === 0 && auto.autoAccepted === 0) {
-          warning =
-            (warning ? warning + " " : "") +
-            `Distributor notify failed: ${notify.errors[0]}`;
-        }
+      if (pipeline.failedHandled > 0) {
+        warning =
+          (warning ? warning + " " : "") +
+          "Some items could not be sourced. Ops will refund or offer a substitute.";
+      } else if (pipeline.waitingHandled > 0) {
+        warning =
+          (warning ? warning + " " : "") +
+          "Some items are waiting for partner stock (up to 2 days). Ops was notified.";
       } else if (
-        notify.notified === 0 &&
+        pipeline.notified === 0 &&
         fulfillmentCount > 0 &&
-        auto.autoAccepted === 0
+        pipeline.autoAccepted === 0
       ) {
         warning =
           (warning ? warning + " " : "") +
-          "Assignment created but no WhatsApp/email was sent (check distributor phone allowlist / Resend).";
+          (pipeline.errors[0]
+            ? `Distributor notify failed: ${pipeline.errors[0]}`
+            : "Assignment created but no WhatsApp/email was sent (check distributor phone allowlist / Resend).");
       }
     } catch (e) {
       console.error("fulfillment notify failed:", e);

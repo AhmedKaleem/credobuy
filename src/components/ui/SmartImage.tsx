@@ -34,6 +34,9 @@ export function SmartImage({
         alt={alt}
         loading={priority ? "eager" : "lazy"}
         onLoad={() => setLoaded(true)}
+        ref={(el) => {
+          if (el?.complete && el.naturalWidth > 0) setLoaded(true);
+        }}
         className={cn(
           "h-full w-full object-cover transition-opacity duration-300",
           loaded ? "opacity-100" : "opacity-0",

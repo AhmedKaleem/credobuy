@@ -1,7 +1,6 @@
-import { Plus } from "lucide-react";
 import { PageHeader, Card, Table } from "@/components/admin/ui";
-import { Button } from "@/components/ui/Button";
 import { AutoApprovalToggle } from "@/components/admin/AutoApprovalToggle";
+import { DistributorForm } from "@/components/admin/DistributorForm";
 import { getDistributors } from "@/lib/queries";
 
 export const metadata = { title: "Distributor Management", robots: { index: false } };
@@ -10,24 +9,21 @@ export default async function AdminDistributorsPage() {
   const distributors = await getDistributors();
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Distributors"
-        description="Suppliers and distribution partners. Auto Approval accepts offers without a portal tap."
-        action={
-          <Button>
-            <Plus size={16} /> Add distributor
-          </Button>
-        }
+        description="Create and update partner details. Auto Approval accepts offers without a portal tap."
       />
+      <DistributorForm />
       <Card className="overflow-hidden">
         <Table
           head={[
             "Distributor",
             "Contact",
             "Location",
-            "Products",
+            "Status",
             "Auto Approval",
+            "",
           ]}
         >
           {distributors.map((d) => (
@@ -42,12 +38,17 @@ export default async function AdminDistributorsPage() {
               <td className="px-4 py-3 text-muted">
                 {d.city}, {d.state}
               </td>
-              <td className="px-4 py-3">{d.productCount}</td>
+              <td className="px-4 py-3 text-sm">
+                {d.isActive === false ? "Inactive" : "Active"}
+              </td>
               <td className="px-4 py-3">
                 <AutoApprovalToggle
                   distributorId={d.id}
                   enabled={Boolean(d.autoApproval)}
                 />
+              </td>
+              <td className="px-4 py-3">
+                <DistributorForm distributor={d} />
               </td>
             </tr>
           ))}

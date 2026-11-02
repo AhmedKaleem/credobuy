@@ -79,16 +79,11 @@ export async function runFulfillmentActionByCode(
     (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
   );
 
-  // Auto-reroute may create a new "offered" row — auto-approve or notify
   try {
-    const { applyAutoApprovalsForOrder } = await import(
-      "@/lib/fulfillment/auto-approve"
+    const { runPostAssignPipeline } = await import(
+      "@/lib/fulfillment/pipeline"
     );
-    const { notifyDistributorsForOrder } = await import(
-      "@/lib/fulfillment/notify"
-    );
-    await applyAutoApprovalsForOrder(fulfillment.orderId);
-    await notifyDistributorsForOrder(fulfillment.orderId);
+    await runPostAssignPipeline(fulfillment.orderId);
   } catch (e) {
     console.error("notify after reject failed:", e);
   }

@@ -16,6 +16,7 @@ import { Newsletter } from "@/components/home/Newsletter";
 import { BundlesSection } from "@/components/home/BundlesSection";
 import { ProductRow } from "@/components/product/ProductGrid";
 import { cn } from "@/lib/utils";
+import type { Product } from "@/types";
 import {
   getAllProducts,
   getBanners,
@@ -78,6 +79,7 @@ export default async function HomePage() {
         <HeroDeviceSelector
           deviceBrands={deviceBrands}
           deviceModels={deviceModels}
+          showcase={lifestyleShowcase(allProducts, bestSellers)}
         />
       </HomeBand>
 
@@ -197,6 +199,35 @@ function HomeBand({
       <Container>{children}</Container>
     </section>
   );
+}
+
+function lifestyleShowcase(
+  all: Awaited<ReturnType<typeof getAllProducts>>,
+  fallback: Awaited<ReturnType<typeof getBestSellers>>
+) {
+  const pool = [...all, ...fallback];
+  const matchers = [
+    /case|cover|protect/i,
+    /charg|gan|power|cable/i,
+    /earbud|audio|headphone|airpod/i,
+  ];
+  const picks: Product[] = [];
+  for (const re of matchers) {
+    const hit = pool.find(
+      (p) =>
+        !picks.includes(p) &&
+        (re.test(p.title) ||
+          re.test(p.productType) ||
+          re.test(p.taxonomyCategory) ||
+          re.test(p.subCategory))
+    );
+    if (hit) picks.push(hit);
+  }
+  for (const p of pool) {
+    if (picks.length >= 3) break;
+    if (!picks.includes(p)) picks.push(p);
+  }
+  return picks.slice(0, 3);
 }
 
 function ViewAll({ href, label = "View all" }: { href: string; label?: string }) {

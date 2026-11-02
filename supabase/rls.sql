@@ -27,6 +27,7 @@ alter table public.fast_delivery_pincodes enable row level security;
 alter table public.order_fulfillments     enable row level security;
 alter table public.fulfillment_events     enable row level security;
 alter table public.fulfillment_rejects    enable row level security;
+alter table public.support_tickets        enable row level security;
 
 -- Public catalog reads
 create policy "public read categories" on public.categories for select using (true);
@@ -149,3 +150,9 @@ create policy "admin all fulfillment rejects" on public.fulfillment_rejects
 -- Customers can post reviews
 create policy "insert own reviews" on public.reviews
   for insert with check (auth.uid() = user_id);
+
+create policy "admin all tickets" on public.support_tickets
+  for all using (public.is_admin()) with check (public.is_admin());
+
+create policy "admin update order items" on public.order_items
+  for update using (public.is_admin()) with check (public.is_admin());

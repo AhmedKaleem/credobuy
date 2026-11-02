@@ -1,6 +1,10 @@
 import type { FulfillmentStatus, OrderFulfillment } from "@/types";
 
 export function mapFulfillment(row: Record<string, unknown>): OrderFulfillment {
+  const rawStatus = String(row.status) as FulfillmentStatus;
+  const waitingUntil = row.waiting_until ? String(row.waiting_until) : undefined;
+  const status: FulfillmentStatus =
+    rawStatus === "pending" && waitingUntil ? "waiting" : rawStatus;
   return {
     id: String(row.id),
     orderId: String(row.order_id),
@@ -8,7 +12,7 @@ export function mapFulfillment(row: Record<string, unknown>): OrderFulfillment {
     productId: row.product_id ? String(row.product_id) : undefined,
     quantity: Number(row.quantity),
     distributorId: row.distributor_id ? String(row.distributor_id) : undefined,
-    status: String(row.status) as FulfillmentStatus,
+    status,
     customerUnitPrice: Number(row.customer_unit_price),
     supplierUnitCost:
       row.supplier_unit_cost == null
@@ -23,6 +27,10 @@ export function mapFulfillment(row: Record<string, unknown>): OrderFulfillment {
     notes: row.notes ? String(row.notes) : undefined,
     assignedAt: row.assigned_at ? String(row.assigned_at) : undefined,
     acceptedAt: row.accepted_at ? String(row.accepted_at) : undefined,
+    failureNotifiedAt: row.failure_notified_at
+      ? String(row.failure_notified_at)
+      : undefined,
+    waitingUntil,
     createdAt: String(row.created_at ?? new Date().toISOString()),
     updatedAt: String(row.updated_at ?? new Date().toISOString()),
     productTitle: row.product_title ? String(row.product_title) : undefined,

@@ -1,7 +1,9 @@
 import { PageHeader, StatusPill } from "@/components/admin/ui";
 import { RerouteForm } from "@/components/admin/RerouteForm";
+import { FailedLineActions } from "@/components/admin/FailedLineActions";
 import { listAdminFulfillments } from "@/lib/fulfillment/queries";
 import { getDistributors } from "@/lib/queries";
+import { fetchAdminProducts } from "@/lib/admin/actions";
 import { formatINR } from "@/lib/utils";
 
 export const metadata = {
@@ -10,25 +12,31 @@ export const metadata = {
 };
 
 export default async function AdminFulfillmentPage() {
-  const [fulfillments, distributors] = await Promise.all([
+  const [fulfillments, distributors, products] = await Promise.all([
     listAdminFulfillments(),
     getDistributors(),
+    fetchAdminProducts(),
   ]);
 
   const open = fulfillments.filter((f) =>
-    ["pending", "offered", "failed", "rejected"].includes(f.status)
+    ["pending", "offered", "failed", "rejected", "waiting"].includes(f.status)
   );
   const rest = fulfillments.filter(
-    (f) => !["pending", "offered", "failed", "rejected"].includes(f.status)
+    (f) =>
+      !["pending", "offered", "failed", "rejected", "waiting"].includes(f.status)
   );
 
   const distOptions = distributors.map((d) => ({ id: d.id, name: d.name }));
+  const productOptions = products.slice(0, 200).map((p) => ({
+    id: p.id,
+    title: p.title,
+  }));
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Fulfillment"
-        description="Assignments, auto-reroute, and admin override. Customer price is always locked; cost variance is CredoBuy risk."
+        description="If no partner has stock we wait 2 days, then you refund or send a substitute. Customer price stays locked."
       />
 
       <section className="space-y-3">
@@ -66,12 +74,31 @@ export default async function AdminFulfillmentPage() {
                         Reason: {f.rejectReason}
                       </p>
                     ) : null}
+                    {f.status === "waiting" && f.waitingUntil ? (
+                      <p className="mt-1 text-xs text-accent">
+                        Holding for stock until{" "}
+                        {new Date(f.waitingUntil).toLocaleString("en-IN")}.
+                      </p>
+                    ) : null}
+                    {f.status === "failed" ? (
+                      <p className="mt-1 text-xs text-danger">
+                        Wait ended. Refund this line or send a substitute.
+                      </p>
+                    ) : null}
                   </div>
-                  <StatusPill tone={f.status === "failed" ? "danger" : "accent"}>
+                  <StatusPill
+                    tone={
+                      f.status === "failed"
+                        ? "danger"
+                        : f.status === "waiting"
+                          ? "accent"
+                          : "accent"
+                    }
+                  >
                     {f.status}
                   </StatusPill>
                 </div>
-                {["offered", "pending", "failed", "rejected"].includes(
+                {["offered", "pending", "failed", "rejected", "waiting"].includes(
                   f.status
                 ) ? (
                   <div className="mt-3 border-t border-border pt-3">
@@ -80,6 +107,12 @@ export default async function AdminFulfillmentPage() {
                       distributors={distOptions}
                     />
                   </div>
+                ) : null}
+                {f.status === "failed" ? (
+                  <FailedLineActions
+                    fulfillmentId={f.id}
+                    products={productOptions}
+                  />
                 ) : null}
               </li>
             ))}

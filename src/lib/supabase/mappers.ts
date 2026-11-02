@@ -167,6 +167,7 @@ export function mapDeviceModel(row: Record<string, unknown>): DeviceModel {
 
 export function mapCoupon(row: Record<string, unknown>): Coupon {
   return {
+    id: row.id ? String(row.id) : undefined,
     code: String(row.code),
     description: String(row.description ?? ""),
     type: row.type === "flat" ? "flat" : "percent",
@@ -189,6 +190,7 @@ export function mapDistributor(row: Record<string, unknown>): Distributor {
     productCount: Number(row.product_count ?? 0),
     userId: row.user_id ? String(row.user_id) : undefined,
     priority: row.priority == null ? undefined : Number(row.priority),
+    isActive: row.is_active == null ? true : Boolean(row.is_active),
     autoApproval: Boolean(row.auto_approval),
   };
 }

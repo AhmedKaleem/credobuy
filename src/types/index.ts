@@ -201,6 +201,7 @@ export interface OrderTimelineEntry {
 }
 
 export interface Coupon {
+  id?: UUID;
   code: string;
   description: string;
   type: "percent" | "flat";
@@ -232,6 +233,7 @@ export interface Distributor {
   productCount: number;
   userId?: UUID;
   priority?: number;
+  isActive?: boolean;
   /** When true, offered lines are accepted automatically. */
   autoApproval?: boolean;
 }
@@ -247,7 +249,8 @@ export type FulfillmentStatus =
   | "packed"
   | "shipped"
   | "delivered"
-  | "failed";
+  | "failed"
+  | "waiting";
 
 /**
  * One fulfillment assignment for an order item.
@@ -273,6 +276,8 @@ export interface OrderFulfillment {
   notes?: string;
   assignedAt?: ISODate;
   acceptedAt?: ISODate;
+    failureNotifiedAt?: ISODate;
+  waitingUntil?: ISODate;
   createdAt: ISODate;
   updatedAt: ISODate;
   /** Joined for UI */

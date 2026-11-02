@@ -23,6 +23,7 @@ const statusTone: Record<
   shipped: "primary",
   delivered: "success",
   failed: "danger",
+  waiting: "accent",
 };
 
 export default async function DistributorHomePage() {

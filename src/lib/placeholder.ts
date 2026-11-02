@@ -124,6 +124,64 @@ export function tilePlaceholder(label: string, seed = label): string {
   return encode(svg);
 }
 
+/** Editorial mosaic art for the homepage lifestyle section. */
+export function lifestyleScene(kind: "protect" | "charge" | "listen"): string {
+  if (kind === "protect") {
+    return encode(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="720" height="960" viewBox="0 0 720 960">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2b2a24"/>
+          <stop offset="1" stop-color="#8a6a4a"/>
+        </linearGradient>
+        <linearGradient id="case" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f4eee6"/>
+          <stop offset="1" stop-color="#d8c7b0"/>
+        </linearGradient>
+      </defs>
+      <rect width="720" height="960" fill="url(#bg)"/>
+      <circle cx="560" cy="160" r="220" fill="#ffffff" opacity="0.06"/>
+      <rect x="210" y="170" width="300" height="580" rx="64" fill="url(#case)"/>
+      <rect x="236" y="214" width="248" height="430" rx="42" fill="#16150f"/>
+      <rect x="268" y="248" width="184" height="300" rx="8" fill="#2f2c26"/>
+      <circle cx="360" cy="690" r="16" fill="#16150f" opacity="0.35"/>
+    </svg>`);
+  }
+  if (kind === "charge") {
+    return encode(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="720" height="480" viewBox="0 0 720 480">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#1c1b16"/>
+          <stop offset="1" stop-color="#4a4840"/>
+        </linearGradient>
+      </defs>
+      <rect width="720" height="480" fill="url(#bg)"/>
+      <circle cx="120" cy="400" r="160" fill="#8a6a4a" opacity="0.25"/>
+      <rect x="250" y="150" width="220" height="180" rx="28" fill="#efede8"/>
+      <rect x="274" y="174" width="172" height="96" rx="12" fill="#16150f"/>
+      <rect x="338" y="330" width="44" height="36" rx="8" fill="#cfc8bc"/>
+      <rect x="348" y="366" width="24" height="40" rx="6" fill="#8a6a4a"/>
+    </svg>`);
+  }
+  return encode(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="720" height="480" viewBox="0 0 720 480">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#3f3d35"/>
+          <stop offset="1" stop-color="#6b675c"/>
+        </linearGradient>
+      </defs>
+      <rect width="720" height="480" fill="url(#bg)"/>
+      <circle cx="600" cy="80" r="140" fill="#ffffff" opacity="0.07"/>
+      <ellipse cx="300" cy="250" rx="70" ry="86" fill="#f6f5f2"/>
+      <ellipse cx="420" cy="250" rx="70" ry="86" fill="#e7e2d8"/>
+      <path d="M300 250 C300 140 420 140 420 250" fill="none" stroke="#d8c7b0" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="300" cy="250" r="18" fill="#16150f"/>
+      <circle cx="420" cy="250" r="18" fill="#16150f"/>
+    </svg>`);
+}
+
 function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }

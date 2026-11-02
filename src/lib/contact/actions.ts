@@ -40,7 +40,26 @@ export async function sendContactEmailAction(
     return { ok: false, error: "Please write a slightly longer message." };
   }
 
+  const { createServiceClient } = await import("@/lib/supabase/service");
+  const svc = createServiceClient();
+  if (svc) {
+    const { error: ticketErr } = await svc.from("support_tickets").insert({
+      name,
+      email,
+      subject,
+      body,
+      status: "open",
+    });
+    if (ticketErr) console.error("support ticket insert:", ticketErr);
+  }
+
   if (!isContactEmailConfigured()) {
+    if (svc) {
+      return {
+        ok: true,
+        message: "Message received — our team will follow up from the admin inbox.",
+      };
+    }
     return {
       ok: false,
       error:

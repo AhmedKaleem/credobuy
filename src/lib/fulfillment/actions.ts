@@ -70,16 +70,11 @@ export async function rejectFulfillmentAction(
     (Array.isArray(data) ? data[0] : data) as Record<string, unknown>
   );
 
-  // Reroute may create a new offered line — notify the next distributor
   try {
-    const { applyAutoApprovalsForOrder } = await import(
-      "@/lib/fulfillment/auto-approve"
+    const { runPostAssignPipeline } = await import(
+      "@/lib/fulfillment/pipeline"
     );
-    const { notifyDistributorsForOrder } = await import(
-      "@/lib/fulfillment/notify"
-    );
-    await applyAutoApprovalsForOrder(fulfillment.orderId);
-    await notifyDistributorsForOrder(fulfillment.orderId);
+    await runPostAssignPipeline(fulfillment.orderId);
   } catch (e) {
     console.error("notify after portal reject failed:", e);
   }
@@ -120,14 +115,10 @@ export async function adminRerouteFulfillmentAction(
   );
 
   try {
-    const { applyAutoApprovalsForOrder } = await import(
-      "@/lib/fulfillment/auto-approve"
+    const { runPostAssignPipeline } = await import(
+      "@/lib/fulfillment/pipeline"
     );
-    const { notifyDistributorsForOrder } = await import(
-      "@/lib/fulfillment/notify"
-    );
-    await applyAutoApprovalsForOrder(fulfillment.orderId);
-    await notifyDistributorsForOrder(fulfillment.orderId);
+    await runPostAssignPipeline(fulfillment.orderId);
   } catch (e) {
     console.error("notify after admin reroute failed:", e);
   }
@@ -159,14 +150,10 @@ export async function createFulfillmentsForOrderAction(
 
   const count = Array.isArray(data) ? data.length : 0;
   try {
-    const { applyAutoApprovalsForOrder } = await import(
-      "@/lib/fulfillment/auto-approve"
+    const { runPostAssignPipeline } = await import(
+      "@/lib/fulfillment/pipeline"
     );
-    const { notifyDistributorsForOrder } = await import(
-      "@/lib/fulfillment/notify"
-    );
-    await applyAutoApprovalsForOrder(orderId);
-    await notifyDistributorsForOrder(orderId);
+    await runPostAssignPipeline(orderId);
   } catch (e) {
     console.error("post-assign fulfillment pipeline:", e);
   }
@@ -174,4 +161,66 @@ export async function createFulfillmentsForOrderAction(
   revalidatePath("/admin/fulfillment");
   revalidatePath("/distributor");
   return { ok: true, count };
+}
+
+export async function adminRefundFulfillmentAction(
+  fulfillmentId: string
+): Promise<FulfillmentActionResult | { ok: true; message: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { ok: false, error: "Admin login required." };
+  }
+  const { refundFulfillmentLine } = await import(
+    "@/lib/fulfillment/admin-resolution"
+  );
+  const res = await refundFulfillmentLine(fulfillmentId);
+  if (!res.ok) return { ok: false, error: res.error };
+  revalidatePath("/admin/fulfillment");
+  revalidatePath("/admin/orders");
+  return {
+    ok: true,
+    message: res.cancelledOrder
+      ? "Order cancelled and refund attempted."
+      : "Line refunded. Remaining items stay in fulfillment.",
+  };
+}
+
+export async function adminSubstituteFulfillmentAction(
+  fulfillmentId: string,
+  productId: string
+): Promise<FulfillmentActionResult | { ok: true; message: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { ok: false, error: "Admin login required." };
+  }
+  if (!productId) return { ok: false, error: "Pick a substitute product." };
+  const { substituteFulfillmentProduct } = await import(
+    "@/lib/fulfillment/admin-resolution"
+  );
+  const res = await substituteFulfillmentProduct(fulfillmentId, productId);
+  if (!res.ok) return { ok: false, error: res.error };
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/service");
+    const svc = createServiceClient();
+    if (svc) {
+      const { data } = await svc
+        .from("order_fulfillments")
+        .select("order_id")
+        .eq("id", fulfillmentId)
+        .maybeSingle();
+      if (data?.order_id) {
+        const { runPostAssignPipeline } = await import(
+          "@/lib/fulfillment/pipeline"
+        );
+        await runPostAssignPipeline(String(data.order_id));
+      }
+    }
+  } catch (e) {
+    console.error("pipeline after substitute:", e);
+  }
+  revalidatePath("/admin/fulfillment");
+  revalidatePath("/distributor");
+  return { ok: true, message: "Substitute assigned and customer notified." };
 }

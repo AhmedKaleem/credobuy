@@ -19,6 +19,7 @@ import {
   Ticket,
   Truck,
   Users,
+  MessageSquare,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
@@ -35,6 +36,7 @@ const nav = [
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/fulfillment", label: "Fulfillment", icon: Route },
   { href: "/admin/customers", label: "Customers", icon: Users },
+  { href: "/admin/tickets", label: "Queries", icon: MessageSquare },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/banners", label: "Banners", icon: ImageIcon },
   { href: "/admin/distributors", label: "Distributors", icon: Truck },

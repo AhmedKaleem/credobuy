@@ -132,8 +132,16 @@ create table if not exists public.order_fulfillments (
   shipped_at timestamptz,
   delivered_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  failure_notified_at timestamptz,
+  waiting_until timestamptz,
+  waiting_notified_at timestamptz
 );
+
+alter table public.order_fulfillments
+  add column if not exists waiting_until timestamptz;
+alter table public.order_fulfillments
+  add column if not exists waiting_notified_at timestamptz;
 
 create index if not exists idx_fulfillments_order
   on public.order_fulfillments(order_id);
@@ -297,10 +305,13 @@ begin
   return true;
 end $$;
 
+drop function if exists public.pick_next_distributor(uuid, integer, uuid);
+
 create or replace function public.pick_next_distributor(
   p_product_id uuid,
   p_qty int,
-  p_order_item_id uuid
+  p_order_item_id uuid,
+  p_max_unit_cost numeric default null
 ) returns uuid language plpgsql security definer set search_path = public as $$
 declare
   v_id uuid;
@@ -311,6 +322,7 @@ begin
   where sp.product_id = p_product_id
     and d.is_active
     and sp.available >= p_qty
+    and (p_max_unit_cost is null or sp.cost_price <= p_max_unit_cost)
     and not exists (
       select 1 from public.fulfillment_rejects fr
       where fr.order_item_id = p_order_item_id
@@ -383,7 +395,8 @@ begin
     assigned_at = now(),
     sla_deadline = now() + interval '4 hours',
     reject_reason = null,
-    rejected_at = null
+    rejected_at = null,
+    waiting_until = null
   where id = p_fulfillment_id
   returning * into f;
 
@@ -411,6 +424,7 @@ declare
   f public.order_fulfillments;
   v_dist uuid;
   v_from fulfillment_status;
+  v_reason text;
 begin
   select * into f from public.order_fulfillments where id = p_fulfillment_id for update;
   if not found then
@@ -420,7 +434,7 @@ begin
   v_from := f.status;
 
   if f.attempt_number > f.max_attempts then
-    update public.order_fulfillments set status = 'failed'
+    update public.order_fulfillments set status = 'failed', waiting_until = null
     where id = p_fulfillment_id returning * into f;
     perform public.log_fulfillment_event(
       p_fulfillment_id, 'failed', v_from, 'failed',
@@ -429,18 +443,55 @@ begin
     return f;
   end if;
 
-  v_dist := public.pick_next_distributor(f.product_id, f.quantity, f.order_item_id);
-  if v_dist is null then
-    update public.order_fulfillments set status = 'failed'
+  v_dist := public.pick_next_distributor(
+    f.product_id, f.quantity, f.order_item_id, f.customer_unit_price
+  );
+  if v_dist is not null then
+    return public.assign_fulfillment(p_fulfillment_id, v_dist, false);
+  end if;
+
+  v_reason := 'no_distributor_available';
+  if exists (
+    select 1
+    from public.supplier_products sp
+    join public.distributors d on d.id = sp.distributor_id
+    where sp.product_id = f.product_id
+      and d.is_active
+      and sp.available >= f.quantity
+      and sp.cost_price > f.customer_unit_price
+      and not exists (
+        select 1 from public.fulfillment_rejects fr
+        where fr.order_item_id = f.order_item_id
+          and fr.distributor_id = sp.distributor_id
+      )
+  ) then
+    v_reason := 'no_profitable_distributor';
+  end if;
+
+  if f.waiting_until is null then
+    update public.order_fulfillments set
+      status = 'pending',
+      waiting_until = now() + interval '2 days',
+      reject_reason = v_reason
     where id = p_fulfillment_id returning * into f;
     perform public.log_fulfillment_event(
-      p_fulfillment_id, 'failed', v_from, 'failed',
-      jsonb_build_object('reason', 'no_distributor_available')
+      p_fulfillment_id, 'note', v_from, 'pending',
+      jsonb_build_object('reason', v_reason, 'waiting_until', f.waiting_until)
     );
     return f;
   end if;
 
-  return public.assign_fulfillment(p_fulfillment_id, v_dist, false);
+  if f.waiting_until > now() then
+    return f;
+  end if;
+
+  update public.order_fulfillments set status = 'failed', waiting_until = null
+  where id = p_fulfillment_id returning * into f;
+  perform public.log_fulfillment_event(
+    p_fulfillment_id, 'failed', v_from, 'failed',
+    jsonb_build_object('reason', v_reason, 'wait_expired', true)
+  );
+  return f;
 end $$;
 
 create or replace function public.create_fulfillments_for_order(p_order_id uuid)
@@ -712,6 +763,23 @@ drop policy if exists "distributor read self" on public.distributors;
 create policy "distributor read self" on public.distributors
   for select using (user_id = auth.uid() or public.is_admin());
 
+create or replace function public.retry_waiting_fulfillments()
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  r record;
+  n int := 0;
+begin
+  for r in
+    select id from public.order_fulfillments
+    where status = 'pending'
+      and waiting_until is not null
+  loop
+    perform public.auto_assign_fulfillment(r.id);
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
 grant execute on function public.accept_fulfillment(uuid) to authenticated;
 grant execute on function public.accept_fulfillment(uuid) to service_role;
 grant execute on function public.reject_fulfillment(uuid, text) to authenticated;
@@ -723,6 +791,8 @@ grant execute on function public.create_fulfillments_for_order(uuid) to service_
 grant execute on function public.assign_fulfillment(uuid, uuid, boolean) to authenticated;
 grant execute on function public.auto_assign_fulfillment(uuid) to authenticated;
 grant execute on function public.expire_stale_fulfillment_offers() to authenticated;
+grant execute on function public.retry_waiting_fulfillments() to authenticated;
+grant execute on function public.retry_waiting_fulfillments() to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Ops notes (manual):

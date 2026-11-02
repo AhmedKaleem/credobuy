@@ -343,6 +343,7 @@ create table if not exists public.payments (
   amount numeric(10,2) not null,
   currency text not null default 'INR',
   status payment_status not null default 'pending',
+  refunded_amount numeric(10,2) not null default 0,
   created_at timestamptz not null default now()
 );
 create index if not exists idx_payments_order on public.payments(order_id);
@@ -414,7 +415,10 @@ create table if not exists public.order_fulfillments (
   shipped_at timestamptz,
   delivered_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  failure_notified_at timestamptz,
+  waiting_until timestamptz,
+  waiting_notified_at timestamptz
 );
 
 create table if not exists public.fulfillment_events (
@@ -435,6 +439,19 @@ create table if not exists public.fulfillment_rejects (
   reason text,
   created_at timestamptz not null default now(),
   unique (order_item_id, distributor_id)
+);
+
+create table if not exists public.support_tickets (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  email text not null,
+  phone text,
+  subject text not null default 'Contact form message',
+  body text not null,
+  status text not null default 'open' check (status in ('open', 'replied', 'closed')),
+  admin_reply text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 -- ----------------------------------------------------------------------------
