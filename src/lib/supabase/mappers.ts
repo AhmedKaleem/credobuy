@@ -35,6 +35,15 @@ function asUuidArray(value: unknown): string[] {
   return [];
 }
 
+/** First non-empty string among DB column aliases (e.g. image vs image_url). */
+function rowText(row: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
 function parseImages(
   id: string,
   title: string,
@@ -123,7 +132,7 @@ function parseVariants(
 export function mapCategory(row: Record<string, unknown>, productCount = 0): Category {
   const name = String(row.name);
   const slug = String(row.slug);
-  const rawImage = row.image_url != null ? String(row.image_url).trim() : "";
+  const rawImage = rowText(row, "image_url", "image");
   return {
     id: String(row.id),
     slug,
@@ -141,7 +150,7 @@ export function mapBrand(row: Record<string, unknown>): Brand {
     id: String(row.id),
     slug: String(row.slug),
     name: String(row.name),
-    logoUrl: String(row.logo_url ?? ""),
+    logoUrl: rowText(row, "logo_url", "logo", "image_url"),
   };
 }
 
@@ -150,7 +159,7 @@ export function mapDeviceBrand(row: Record<string, unknown>): DeviceBrand {
     id: String(row.id),
     slug: String(row.slug),
     name: String(row.name),
-    logoUrl: String(row.logo_url ?? ""),
+    logoUrl: rowText(row, "logo_url", "logo", "image_url"),
   };
 }
 
@@ -203,7 +212,7 @@ export function mapBanner(row: Record<string, unknown>): Banner {
     eyebrow: row.eyebrow ? String(row.eyebrow) : undefined,
     ctaLabel: String(row.cta_label ?? "Shop now"),
     ctaHref: String(row.cta_href ?? "/shop"),
-    imageUrl: String(row.image_url ?? ""),
+    imageUrl: rowText(row, "image", "image_url"),
     bg: String(row.bg ?? "from-[#16150f] to-[#3f3d35]"),
     textTone: row.text_tone === "dark" ? "dark" : "light",
   };

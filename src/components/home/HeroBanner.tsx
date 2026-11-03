@@ -44,10 +44,28 @@ export function HeroBanner({ banners }: { banners: Banner[] }) {
               )}
               aria-hidden={i !== index}
             >
-              <div className={cn("flex h-full w-full bg-gradient-to-br", b.bg)}>
+              <div className={cn("relative flex h-full w-full bg-gradient-to-br", b.bg)}>
+                {b.imageUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={b.imageUrl}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                    <div
+                      className={cn(
+                        "absolute inset-0",
+                        light
+                          ? "bg-gradient-to-r from-black/70 via-black/35 to-black/10"
+                          : "bg-gradient-to-r from-white/80 via-white/45 to-transparent"
+                      )}
+                    />
+                  </>
+                ) : null}
                 <div
                   className={cn(
-                    "mx-auto flex h-full w-full max-w-7xl flex-col items-start justify-center gap-5 px-6 py-16 sm:px-10 lg:px-16",
+                    "relative z-[1] mx-auto flex h-full w-full max-w-7xl flex-col items-start justify-center gap-5 px-6 py-16 sm:px-10 lg:px-16",
                     light ? "text-white" : "text-foreground"
                   )}
                 >

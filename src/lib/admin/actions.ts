@@ -163,36 +163,49 @@ export async function saveBannerAction(
     const sb = await createClient();
     if (!sb) return { ok: false, error: "Supabase unavailable" };
 
-    const row = {
+    const image = input.imageUrl ?? null;
+    const base = {
       title: input.title,
       subtitle: input.subtitle ?? null,
       eyebrow: input.eyebrow ?? null,
       cta_label: input.ctaLabel ?? "Shop now",
       cta_href: input.ctaHref ?? "/shop",
-      image_url: input.imageUrl ?? null,
       bg: input.bg ?? "from-[#16150f] to-[#3f3d35]",
       text_tone: input.textTone ?? "light",
       sort_order: input.sortOrder ?? 0,
       is_active: input.isActive !== false,
     };
+    const payloads: Record<string, unknown>[] = [
+      { ...base, image, image_url: image },
+      { ...base, image },
+      { ...base, image_url: image },
+    ];
 
-    if (input.id) {
-      const { error } = await sb.from("banners").update(row).eq("id", input.id);
-      if (error) return { ok: false, error: error.message };
-      revalidatePath("/admin/banners");
-      revalidatePath("/");
-      return { ok: true, id: input.id };
+    let lastError = "Could not save banner.";
+    for (const payload of payloads) {
+      if (input.id) {
+        const { error } = await sb.from("banners").update(payload).eq("id", input.id);
+        if (!error) {
+          revalidatePath("/admin/banners");
+          revalidatePath("/");
+          return { ok: true, id: input.id };
+        }
+        lastError = error.message;
+        continue;
+      }
+      const { data, error } = await sb
+        .from("banners")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (!error && data) {
+        revalidatePath("/admin/banners");
+        revalidatePath("/");
+        return { ok: true, id: data.id as string };
+      }
+      lastError = error?.message ?? lastError;
     }
-
-    const { data, error } = await sb
-      .from("banners")
-      .insert(row)
-      .select("id")
-      .single();
-    if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
-    revalidatePath("/admin/banners");
-    revalidatePath("/");
-    return { ok: true, id: data.id as string };
+    return { ok: false, error: lastError };
   }
 
   const existing = heroBanners.find((b) => b.id === input.id);

@@ -131,7 +131,7 @@ export function mapDbBanner(row: Record<string, unknown>): Banner {
     eyebrow: row.eyebrow ? String(row.eyebrow) : undefined,
     ctaLabel: String(row.cta_label ?? "Shop now"),
     ctaHref: String(row.cta_href ?? "/shop"),
-    imageUrl: String(row.image_url ?? ""),
+    imageUrl: String(row.image ?? row.image_url ?? "").trim(),
     bg: String(row.bg ?? "from-[#16150f] to-[#3f3d35]"),
     textTone: row.text_tone === "dark" ? "dark" : "light",
   };

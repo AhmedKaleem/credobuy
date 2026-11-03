@@ -212,6 +212,7 @@ create table if not exists public.banners (
   eyebrow text,
   cta_label text,
   cta_href text,
+  image text,
   image_url text,
   bg text,
   text_tone text not null default 'light',

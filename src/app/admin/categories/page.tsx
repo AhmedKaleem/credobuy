@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { PageHeader, Card, Table } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { SmartImage } from "@/components/ui/SmartImage";
 import { getCategories } from "@/lib/queries";
 
 export const metadata = { title: "Category Management", robots: { index: false } };
@@ -27,9 +28,15 @@ export default async function AdminCategoriesPage() {
               <td className="px-4 py-3 text-muted">{c.sortOrder}</td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                    <Icon name={c.icon} size={18} />
-                  </span>
+                  {c.imageUrl && !c.imageUrl.startsWith("data:") ? (
+                    <span className="h-9 w-9 overflow-hidden rounded-lg border border-border">
+                      <SmartImage src={c.imageUrl} alt={c.name} />
+                    </span>
+                  ) : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                      <Icon name={c.icon} size={18} />
+                    </span>
+                  )}
                   <div>
                     <p className="font-medium">{c.name}</p>
                     <p className="line-clamp-1 text-xs text-muted">{c.description}</p>
