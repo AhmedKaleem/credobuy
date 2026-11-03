@@ -12,6 +12,7 @@ import type {
   Review,
 } from "@/types";
 import { createPublicClient } from "@/lib/supabase/public";
+import { createServiceClient } from "@/lib/supabase/service";
 import {
   mapBanner,
   mapBrand,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/supabase/mappers";
 
 function sb() {
-  return createPublicClient();
+  return createServiceClient() ?? createPublicClient();
 }
 
 export async function sbGetCategories(): Promise<Category[] | null> {
@@ -133,10 +134,16 @@ export async function sbGetBanners(): Promise<Banner[] | null> {
   const { data, error } = await client
     .from("banners")
     .select("*")
-    .eq("is_active", true)
     .order("sort_order", { ascending: true });
-  if (error || !data) return null;
-  return data.map((row) => mapBanner(row as Record<string, unknown>));
+  if (error) {
+    console.error("sbGetBanners:", error.message);
+    return null;
+  }
+  const rows = (data ?? []).filter((row) => {
+    const active = (row as { is_active?: boolean | null }).is_active;
+    return active !== false;
+  });
+  return rows.map((row) => mapBanner(row as Record<string, unknown>));
 }
 
 export async function sbGetPromotions(

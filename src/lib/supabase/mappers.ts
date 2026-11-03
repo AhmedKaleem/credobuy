@@ -38,10 +38,34 @@ function asUuidArray(value: unknown): string[] {
 /** First non-empty string among DB column aliases (e.g. image vs image_url). */
 function rowText(row: Record<string, unknown>, ...keys: string[]): string {
   for (const key of keys) {
-    const value = row[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
+    const resolved = resolveMediaUrl(row[key]);
+    if (resolved) return resolved;
   }
   return "";
+}
+
+/** Turn a table image/logo value into a browser URL. */
+export function resolveMediaUrl(value: unknown): string {
+  if (value == null || value === false) return "";
+  if (Array.isArray(value)) return resolveMediaUrl(value[0]);
+  if (typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    return resolveMediaUrl(
+      o.publicUrl ?? o.public_url ?? o.signedUrl ?? o.url ?? o.src ?? o.path ?? o.image
+    );
+  }
+  const raw = String(value).trim();
+  if (!raw || raw === "null" || raw === "undefined") return "";
+  if (/^(https?:\/\/|data:|blob:)/i.test(raw)) return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+  if (raw.startsWith("/")) return raw;
+
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  if (!base) return raw;
+  const path = raw.replace(/^\/+/, "");
+  if (path.startsWith("storage/v1/object/public/")) return `${base}/${path}`;
+  const storagePath = path.includes("/") ? path : `banners/${path}`;
+  return `${base}/storage/v1/object/public/${storagePath}`;
 }
 
 function parseImages(

@@ -38,9 +38,7 @@ create policy "public read products" on public.products for select using (is_act
 create policy "public read reviews" on public.reviews for select using (true);
 create policy "public read coupons" on public.coupons for select using (active);
 create policy "public read banners" on public.banners for select using (
-  is_active
-  and (valid_from is null or valid_from <= now())
-  and (valid_to is null or valid_to >= now())
+  is_active is not false
 );
 create policy "public read promotions" on public.promotions for select using (
   is_active

@@ -301,7 +301,9 @@ export async function findCoupon(code: string): Promise<Coupon | undefined> {
 export async function getBanners() {
   if (isSupabaseConfigured()) {
     const rows = await sbGetBanners();
-    if (rows && rows.length) return rows;
+    if (rows) return rows;
+    console.error("getBanners: Supabase query failed; not using local placeholder art.");
+    return [];
   }
   return mergeBanners(localBanners);
 }

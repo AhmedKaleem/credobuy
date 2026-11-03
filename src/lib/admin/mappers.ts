@@ -1,6 +1,6 @@
 import type { Banner, Product, StockStatus } from "@/types";
 import { productPlaceholder } from "@/lib/placeholder";
-import { mapProduct } from "@/lib/supabase/mappers";
+import { mapProduct, resolveMediaUrl } from "@/lib/supabase/mappers";
 
 export type ProductInput = {
   id?: string;
@@ -131,7 +131,7 @@ export function mapDbBanner(row: Record<string, unknown>): Banner {
     eyebrow: row.eyebrow ? String(row.eyebrow) : undefined,
     ctaLabel: String(row.cta_label ?? "Shop now"),
     ctaHref: String(row.cta_href ?? "/shop"),
-    imageUrl: String(row.image ?? row.image_url ?? "").trim(),
+    imageUrl: resolveMediaUrl(row.image ?? row.image_url ?? row.imageUrl),
     bg: String(row.bg ?? "from-[#16150f] to-[#3f3d35]"),
     textTone: row.text_tone === "dark" ? "dark" : "light",
   };

@@ -22,6 +22,8 @@ export function HeroBanner({ banners }: { banners: Banner[] }) {
   const go = (dir: number) =>
     setIndex((i) => (i + dir + banners.length) % banners.length);
 
+  if (!banners.length) return null;
+
   return (
     <section
       aria-label="Featured collections"
@@ -33,6 +35,8 @@ export function HeroBanner({ banners }: { banners: Banner[] }) {
       <div className="relative h-[68vh] overflow-hidden sm:h-[74vh] lg:h-[560px] xl:h-[620px]">
         {banners.map((b, i) => {
           const light = b.textTone !== "dark";
+          const photo =
+            b.imageUrl && !b.imageUrl.startsWith("data:") ? b.imageUrl : "";
           return (
             <div
               key={b.id}
@@ -45,11 +49,11 @@ export function HeroBanner({ banners }: { banners: Banner[] }) {
               aria-hidden={i !== index}
             >
               <div className={cn("relative flex h-full w-full bg-gradient-to-br", b.bg)}>
-                {b.imageUrl ? (
+                {photo ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={b.imageUrl}
+                      src={photo}
                       alt=""
                       className="absolute inset-0 h-full w-full object-cover"
                     />
