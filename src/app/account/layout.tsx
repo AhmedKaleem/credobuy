@@ -30,9 +30,10 @@ export default function AccountLayout({
   const pathname = usePathname();
   const mounted = useMounted();
   const user = useAuth((s) => s.user);
+  const ready = useAuth((s) => s.ready);
   const logout = useAuth((s) => s.logout);
 
-  if (!mounted) {
+  if (!mounted || !ready) {
     return (
       <Container className="py-6">
         <Skeleton className="h-96" />

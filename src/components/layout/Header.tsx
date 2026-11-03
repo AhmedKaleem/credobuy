@@ -21,6 +21,7 @@ import { Icon } from "@/components/ui/Icon";
 import { useCart } from "@/store/cart";
 import { useWishlist } from "@/store/wishlist";
 import { useMounted } from "@/hooks/useMounted";
+import { useAuth } from "@/store/auth";
 import { cn } from "@/lib/utils";
 
 interface HeaderProps {
@@ -43,6 +44,8 @@ export function Header({ categories, deviceBrands, bestSellers }: HeaderProps) {
 
   const cartCount = useCart((s) => s.items.reduce((n, i) => n + i.quantity, 0));
   const wishlistCount = useWishlist((s) => s.ids.length);
+  const user = useAuth((s) => s.user);
+  const accountHref = user ? "/account" : "/login";
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur-md">
@@ -144,7 +147,7 @@ export function Header({ categories, deviceBrands, bestSellers }: HeaderProps) {
               <Search size={21} strokeWidth={1.6} />
               <span className="mt-0.5 hidden text-[11px] font-medium lg:block">Search</span>
             </button>
-            <HeaderIcon href="/account" label="Account" icon={User} />
+            <HeaderIcon href={accountHref} label="Account" icon={User} />
             <HeaderIcon
               href="/account/wishlist"
               label="Wishlist"
@@ -171,6 +174,7 @@ export function Header({ categories, deviceBrands, bestSellers }: HeaderProps) {
         <MobileMenu
           categories={categories}
           deviceBrands={deviceBrands}
+          accountHref={accountHref}
           onClose={() => setMenuOpen(false)}
         />
       )}
@@ -209,10 +213,12 @@ function HeaderIcon({
 function MobileMenu({
   categories,
   deviceBrands,
+  accountHref,
   onClose,
 }: {
   categories: Category[];
   deviceBrands: DeviceBrand[];
+  accountHref: string;
   onClose: () => void;
 }) {
   return (
@@ -302,7 +308,7 @@ function MobileMenu({
         </div>
 
         <div className="mt-6 space-y-1 border-t border-border pt-4">
-          <Link href="/account" onClick={onClose} className="block rounded-lg px-3 py-2.5 hover:bg-surface-muted">
+          <Link href={accountHref} onClick={onClose} className="block rounded-lg px-3 py-2.5 hover:bg-surface-muted">
             My Account
           </Link>
           <Link href="/account/orders" onClick={onClose} className="block rounded-lg px-3 py-2.5 hover:bg-surface-muted">

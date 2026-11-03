@@ -6,6 +6,7 @@ import { Logo } from "@/components/layout/Logo";
 import { Field, Input } from "@/components/ui/form";
 import { Button } from "@/components/ui/Button";
 import { adminLoginAction } from "@/lib/auth/actions";
+import { isSupabaseConfigured } from "@/lib/config";
 
 function Form() {
   const router = useRouter();
@@ -78,11 +79,13 @@ function Form() {
           </Button>
         </form>
 
-        <p className="mt-5 text-center text-xs text-muted">
-          Demo (no Supabase):{" "}
-          <code className="text-foreground">admin@credobuy.com</code> /{" "}
-          <code className="text-foreground">CredoBuy@Admin1</code>
-        </p>
+        {!isSupabaseConfigured() ? (
+          <p className="mt-5 text-center text-xs text-muted">
+            Demo (no Supabase):{" "}
+            <code className="text-foreground">admin@credobuy.com</code> /{" "}
+            <code className="text-foreground">CredoBuy@Admin1</code>
+          </p>
+        ) : null}
       </div>
     </div>
   );

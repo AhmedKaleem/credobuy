@@ -16,21 +16,30 @@ function LoginForm() {
   const redirect = params.get("redirect") ?? "/account";
   const login = useAuth((s) => s.login);
   const pushToast = useToast((s) => s.push);
+  const bannerError = params.get("error");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = "Enter a valid email";
     if (password.length < 6) next.password = "Minimum 6 characters";
     setErrors(next);
     if (Object.keys(next).length) return;
-    login(email);
+    setBusy(true);
+    const res = await login(email, password);
+    setBusy(false);
+    if (!res.ok) {
+      setErrors({ password: res.error });
+      return;
+    }
     pushToast("Welcome back!");
-    router.push(redirect);
+    router.push(redirect.startsWith("/") ? redirect : "/account");
+    router.refresh();
   }
 
   return (
@@ -41,6 +50,11 @@ function LoginForm() {
       <div className="rounded-[var(--radius-card)] border border-border bg-surface p-6 sm:p-8">
         <h1 className="text-2xl font-bold">Welcome back</h1>
         <p className="mt-1 text-sm text-muted">Sign in to continue to CredoBuy.</p>
+        {bannerError ? (
+          <p className="mt-3 text-sm text-danger" role="alert">
+            {bannerError}
+          </p>
+        ) : null}
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <Field label="Email" htmlFor="email" error={errors.email}>
@@ -63,8 +77,8 @@ function LoginForm() {
               autoComplete="current-password"
             />
           </Field>
-          <Button type="submit" className="w-full" size="lg">
-            Sign In
+          <Button type="submit" className="w-full" size="lg" disabled={busy}>
+            {busy ? "Signing in…" : "Sign in"}
           </Button>
         </form>
 
@@ -75,9 +89,6 @@ function LoginForm() {
           </Link>
         </p>
       </div>
-      <p className="mt-4 text-center text-xs text-muted">
-        Demo mode — any valid email and 6+ char password works.
-      </p>
     </div>
   );
 }

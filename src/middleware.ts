@@ -8,81 +8,22 @@ import {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  if (pathname.startsWith("/admin")) {
-    return protectAdmin(request, pathname);
-  }
-
-  if (pathname.startsWith("/distributor")) {
-    return protectDistributor(request, pathname);
-  }
-
-  return NextResponse.next();
-}
-
-async function protectAdmin(request: NextRequest, pathname: string) {
-  if (pathname === "/admin/login") {
-    return NextResponse.next();
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (supabaseUrl && supabaseKey) {
-    const { response, supabase } = createMiddlewareClient(
-      request,
-      supabaseUrl,
-      supabaseKey,
-      false
-    );
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return redirectTo(request, "/admin/login", pathname);
-    }
-
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profile?.role !== "admin") {
-      await supabase.auth.signOut();
-      return redirectTo(request, "/admin/login", pathname);
-    }
-
-    return response;
-  }
-
-  if (!request.cookies.get(ADMIN_COOKIE)?.value) {
-    return redirectTo(request, "/admin/login", pathname);
-  }
-
-  return NextResponse.next();
-}
-
-async function protectDistributor(request: NextRequest, pathname: string) {
-  if (
-    pathname === "/distributor/login" ||
-    pathname === "/distributor/act"
-  ) {
-    return NextResponse.next();
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    return redirectTo(request, "/distributor/login", pathname);
+    if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+      if (!request.cookies.get(ADMIN_COOKIE)?.value) {
+        return redirectTo(request, "/admin/login", pathname);
+      }
+    }
+    if (pathname.startsWith("/account")) {
+      return redirectTo(request, "/login", pathname);
+    }
+    return NextResponse.next();
   }
 
-  const remember =
-    request.cookies.get(DIST_REMEMBER_COOKIE)?.value === "1";
-
+  const remember = request.cookies.get(DIST_REMEMBER_COOKIE)?.value === "1";
   const { response, supabase } = createMiddlewareClient(
     request,
     supabaseUrl,
@@ -94,30 +35,56 @@ async function protectDistributor(request: NextRequest, pathname: string) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return redirectTo(request, "/distributor/login", pathname);
+  if (pathname.startsWith("/admin")) {
+    if (pathname === "/admin/login") return response;
+    if (!user) return redirectTo(request, "/admin/login", pathname);
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profile?.role !== "admin") {
+      await supabase.auth.signOut();
+      return redirectTo(request, "/admin/login", pathname);
+    }
+    return response;
   }
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profile?.role !== "distributor") {
-    await supabase.auth.signOut();
-    return redirectTo(request, "/distributor/login", pathname);
+  if (pathname.startsWith("/distributor")) {
+    if (pathname === "/distributor/login" || pathname === "/distributor/act") {
+      return response;
+    }
+    if (!user) return redirectTo(request, "/distributor/login", pathname);
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profile?.role !== "distributor") {
+      await supabase.auth.signOut();
+      return redirectTo(request, "/distributor/login", pathname);
+    }
+    const { data: dist } = await supabase
+      .from("distributors")
+      .select("id, is_active")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!dist?.id || dist.is_active === false) {
+      await supabase.auth.signOut();
+      return redirectTo(request, "/distributor/login", pathname);
+    }
+    return response;
   }
 
-  const { data: dist } = await supabase
-    .from("distributors")
-    .select("id, is_active")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  if (pathname.startsWith("/account") && !user) {
+    return redirectTo(request, "/login", pathname);
+  }
 
-  if (!dist?.id || dist.is_active === false) {
-    await supabase.auth.signOut();
-    return redirectTo(request, "/distributor/login", pathname);
+  if ((pathname === "/login" || pathname === "/register") && user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/account";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
 
   return response;
@@ -146,9 +113,7 @@ function createMiddlewareClient(
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, {
             ...options,
-            ...(rememberDistributor
-              ? { maxAge: DIST_REMEMBER_MAX_AGE }
-              : {}),
+            ...(rememberDistributor ? { maxAge: DIST_REMEMBER_MAX_AGE } : {}),
           })
         );
       },
@@ -166,5 +131,12 @@ function redirectTo(request: NextRequest, loginPath: string, pathname: string) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/distributor/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/distributor/:path*",
+    "/account/:path*",
+    "/login",
+    "/register",
+    "/auth/:path*",
+  ],
 };

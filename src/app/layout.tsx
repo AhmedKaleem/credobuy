@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { FloatingActions } from "@/components/layout/FloatingActions";
 import { Toaster } from "@/components/ui/Toaster";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import { getAnnouncements, getCategories, getDeviceBrands, getBestSellers } from "@/lib/queries";
 
 const geistSans = Geist({
@@ -56,6 +57,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} h-full`}>
       <body className="flex min-h-full flex-col antialiased">
+        <AuthProvider>
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-white"
@@ -74,6 +76,7 @@ export default async function RootLayout({
         <Footer categories={categories} />
         <FloatingActions />
         <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

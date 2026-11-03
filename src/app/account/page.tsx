@@ -22,14 +22,18 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [error, setError] = useState("");
 
-  function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent) {
     e.preventDefault();
     if (phone && !isValidPhone(phone)) {
       setError("Enter a valid 10-digit number");
       return;
     }
     setError("");
-    updateProfile({ fullName, phone });
+    const res = await updateProfile({ fullName, phone });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
     pushToast("Profile updated");
   }
 

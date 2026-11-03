@@ -17,22 +17,40 @@ export default function RegisterPage() {
 
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [confirmNote, setConfirmNote] = useState("");
 
   function set(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!form.name.trim()) next.name = "Name is required";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = "Enter a valid email";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      next.email = "Enter a valid email";
     if (form.password.length < 6) next.password = "Minimum 6 characters";
     setErrors(next);
     if (Object.keys(next).length) return;
-    register(form.name.trim(), form.email);
+    setBusy(true);
+    setConfirmNote("");
+    const res = await register(form.name.trim(), form.email, form.password);
+    setBusy(false);
+    if (!res.ok) {
+      setErrors({ email: res.error });
+      return;
+    }
+    if (res.needsEmailConfirm) {
+      setConfirmNote(
+        "Account created. Check your email and confirm the link, then sign in."
+      );
+      pushToast("Check your email to confirm your account.");
+      return;
+    }
     pushToast("Account created!");
     router.push("/account");
+    router.refresh();
   }
 
   return (
@@ -77,8 +95,11 @@ export default function RegisterPage() {
                 autoComplete="new-password"
               />
             </Field>
-            <Button type="submit" className="w-full" size="lg">
-              Create Account
+            {confirmNote ? (
+              <p className="text-sm text-accent">{confirmNote}</p>
+            ) : null}
+            <Button type="submit" className="w-full" size="lg" disabled={busy}>
+              {busy ? "Creating…" : "Create account"}
             </Button>
           </form>
 

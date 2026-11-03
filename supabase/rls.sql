@@ -78,6 +78,8 @@ create policy "read own user" on public.users
   for select using (auth.uid() = id or public.is_admin());
 create policy "update own user" on public.users
   for update using (auth.uid() = id) with check (auth.uid() = id);
+create policy "insert own user" on public.users
+  for insert with check (auth.uid() = id);
 
 -- Addresses
 create policy "own addresses" on public.addresses

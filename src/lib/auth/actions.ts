@@ -161,3 +161,122 @@ export async function distributorLogoutAction() {
   });
   redirect("/distributor/login");
 }
+
+export type CustomerAuthResult =
+  | { ok: true; needsEmailConfirm?: boolean }
+  | { ok: false; error: string };
+
+export async function customerLoginAction(
+  email: string,
+  password: string
+): Promise<CustomerAuthResult> {
+  const trimmed = email.trim().toLowerCase();
+  if (!trimmed || password.length < 6) {
+    return { ok: false, error: "Enter a valid email and password." };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Sign-in is not configured. Add Supabase keys." };
+  }
+  const sb = await createClient();
+  if (!sb) return { ok: false, error: "Could not connect to sign-in." };
+
+  const { error } = await sb.auth.signInWithPassword({
+    email: trimmed,
+    password,
+  });
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("email not confirmed")) {
+      return {
+        ok: false,
+        error: "Please confirm your email, then sign in.",
+      };
+    }
+    return { ok: false, error: "Invalid email or password." };
+  }
+  return { ok: true };
+}
+
+export async function customerRegisterAction(
+  fullName: string,
+  email: string,
+  password: string
+): Promise<CustomerAuthResult> {
+  const name = fullName.trim();
+  const trimmed = email.trim().toLowerCase();
+  if (!name) return { ok: false, error: "Enter your name." };
+  if (!trimmed || password.length < 6) {
+    return { ok: false, error: "Enter a valid email and a password of 6+ characters." };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Sign-up is not configured. Add Supabase keys." };
+  }
+  const sb = await createClient();
+  if (!sb) return { ok: false, error: "Could not connect to sign-up." };
+
+  const { getAppBaseUrl } = await import("@/lib/config");
+  const { error, data } = await sb.auth.signUp({
+    email: trimmed,
+    password,
+    options: {
+      data: { full_name: name },
+      emailRedirectTo: `${getAppBaseUrl()}/auth/callback`,
+    },
+  });
+  if (error) return { ok: false, error: error.message };
+
+  if (data.user) {
+    const { createServiceClient } = await import("@/lib/supabase/service");
+    const svc = createServiceClient() ?? sb;
+    await svc.from("users").upsert(
+      {
+        id: data.user.id,
+        email: trimmed,
+        full_name: name,
+        role: "customer",
+      },
+      { onConflict: "id" }
+    );
+  }
+
+  if (!data.session) {
+    return { ok: true, needsEmailConfirm: true };
+  }
+  return { ok: true };
+}
+
+export async function customerLogoutAction() {
+  if (isSupabaseConfigured()) {
+    const sb = await createClient();
+    await sb?.auth.signOut();
+  }
+  redirect("/");
+}
+
+export async function updateCustomerProfileAction(input: {
+  fullName: string;
+  phone?: string;
+}): Promise<CustomerAuthResult> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Profile updates require Supabase." };
+  }
+  const sb = await createClient();
+  if (!sb) return { ok: false, error: "Could not save profile." };
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Please sign in." };
+
+  const { error } = await sb
+    .from("users")
+    .update({
+      full_name: input.fullName.trim(),
+      phone: input.phone?.trim() || null,
+    })
+    .eq("id", user.id);
+  if (error) return { ok: false, error: error.message };
+  await sb.auth.updateUser({
+    data: { full_name: input.fullName.trim() },
+  });
+  return { ok: true };
+}
